@@ -2,7 +2,12 @@ import asyncio
 import pyppeteer
 import time
 import traceback
-import urlparse
+# import urlparse
+import os
+import json
+import re
+import hashlib
+from urllib import parse as urlparse
 import sys
 from pyppeteer.launcher import connect
 from pyppeteer import launch
@@ -193,94 +198,8 @@ async def hook_console(console):
 
 
 
-async def main2():
-    brower = await connect(browserWSEndpoint='ws://0.0.0.0:9222/devtools/browser/acfde542-a560-464e-bcb3-7ea19026c12d')
-    #brower = await launch()
-    #print(type(brower))
-    page = await brower.newPage()
-    await page.setRequestInterception(True)
-    page.on('load',await mutationobserver(page))
-    await get_event(page)
-    page.on('dialog', dismiss_dialog)
-    page.on('request', hook_request)
-    page.on('console', hook_console)
-    page.on('response', hook_response)
-    #await page.goto('https://github.com')
-    #await page.setCookie(*cookie)
-    #await page.goto('https://github.com/settings/emails', waitUntil='networkidle0')
-    #title = await page.title()
-    #print(title)
-    # test on testphp.vulnweb.com/AJAX/index.php
-
-    await page.goto('http://testphp.vulnweb.com/AJAX/index.php', waitUntil='networkidle0')
-    title = await page.title()
-    print(title)
-    await page.evaluate('console.log("console log hook test")')
-    htmlhandle = await page.querySelectorAll('a')
-    for i in htmlhandle:
-        await asyncio.wait([
-            page.waitForNavigation(waitUntil='networkidle0'),
-            i.click(),
-        ])
-        await i.click()
-        print(await page.evaluate('''()=> {return window.nodes}'''))
-
-    print(await page.evaluate('''()=> {return window.LINKS}'''))
-
-    print('--------click all a tag done-----------')
-
-    html = await page.content()
-    (links, onevents, jsfunc) = await exec_events_a(page, html, 'a')
-    print(links)
-    print(onevents)
-    print(jsfunc)
-    for item in onevents:
-        #htmlhandle = await page.querySelector("{}[{}*={}]".format(item['tagname'], item['oneventname'], item['oneventvalue']))
-        #await htmlhandle.click()
-        await asyncio.wait([
-            page.waitForNavigation(waitUntil='networkidle0'),
-            page.evaluate(item['oneventvalue'])
-            ])
-
-    for item in jsfunc:
-        await asyncio.wait([
-            page.waitForNavigation(waitUntil='networkidle0'),
-            page.evaluate(item)
-            ])
-
-    print('------------execute jsfunc done-----------')
-    print('------------reload html-----------')
-    html = await page.content()
-    (links, onevents, jsfunc) = await exec_events_a(page, html, 'a')
-    print(links)
-    print(onevents)
-    print(jsfunc)
-
-    print('--------evaluate done---------------')
-    '''
-    htmlhandle = await page.querySelectorAll('a')
-    print(dir(htmlhandle[0]))
-    for i in htmlhandle:
-        a_properties = await i.getProperties()
-        print('a_properties------------------------')
-        print(a_properties)
-        a_executionContent = i.executionContext
-        print('---------------------')
-        print(a_executionContent)
-    '''
-
-    #print(elements)
-    #print(dir(elements))
-    await elements[0].click()
-
-
-    time.sleep(3)
-    #await brower.close()
-    #page.close()
-    #brower.close()
-
-
-
+def md5(str):
+    pass
 
 
 
@@ -289,13 +208,15 @@ class FrameDeal(object):
     '''
     流程上来说应该先填写form, 选择select再点击on事件
     '''
-    def __init__(self, frame, fetched_url,timeout=10): # timeout暂定
+    def __init__(self, frame, fetched_url, urlqueue, pattern, timeout=10): # timeout暂定
         self.frame = frame
         self.fetched_url = fetched_url # {'static':'不触发JS时的链接', 'xhr': 'js触发的链接'} 
         self.event = []
-        self.js_func_str = []
+        self.js_func_str = set()
         self.url = frame.url
         self.based_url = ''
+        self.pattern = pattern
+        self.urlqueue = urlqueue # 把所有的url都加到queue里
         self.scheme = urlparse.urlparse(self.url).scheme
         self.netloc = urlparse.urlparse(self.url).netloc
 
@@ -322,8 +243,13 @@ class FrameDeal(object):
             final_url = self.scheme  + ':' + url
         elif url.startswith('/'): # /test.php
             final_url = self.based_url.rstrip('/') + url
-        else: # test.php
-            final_url = self.based_url.rstrip('') + "" + url
+        # elif url.startswith(".."): # ../test.php
+        #     rindex = self.based_url.rindex('/')
+        #     final_url = self.based_url[:rindex+1] + url
+        else: # test.php, ../test.php
+            rindex = self.based_url.rindex('/')
+            final_url = self.based_url[:rindex+1] + url
+            # final_url = self.based_url.rstrip('') + "" + url
 
         return final_url
 
@@ -338,6 +264,17 @@ class FrameDeal(object):
         else:
             return False
 
+
+    def genPattern(self, url):
+        '''
+        先简单的把数字替换成digit, 先换成param试一下
+        '''
+        if '?' in url:
+            param = url[url.rindex('?'):]
+            pattern = re.sub(r'\d+', '{digit}', param)
+        else:
+            pattern = url
+        return pattern
 
     async def FetchAHref(self):
         '''
@@ -357,12 +294,102 @@ class FrameDeal(object):
                 if not self.sameOrign(url):
                     continue
                 self.fetched_url['static'].append(url)
+                pattern = self.genPattern(url)
+                print('-------------------------------------------\n')
+                print('[PATTERN]: {}'.format(pattern))
+                print('-------------------------------------------\n')
+                if pattern is not None and pattern in self.pattern:
+                    continue
+                else:
+                    self.pattern.add(pattern)
+                    print('-------------------------------------------\n')
+                    print('[ADD TO URLQUEUE]: {}'.format(url))
+                    print('-------------------------------------------\n')
+                    await self.urlqueue.put(url)
 
 
     async def FillInputAndSelect(self):
-        inputs = self.frame.querySelectorAll('input')
-        for i in inputs:
-            i_properties = await i.getProperties()
+        '''
+        看了一下，没有发现pyppeteer有获取dom树节点的api，那么只能用evaluate来执行js，填充命令了
+        '''
+        js_fillinput_str = '''function fillinput(){
+        var inputs = document.querySelectorAll("input")
+        for(var i = 0; i < inputs.length; i++){
+            inp = inputs[i];
+            if ('value' in inp && inp['value'] != ''){
+                console.log("value not empty, continue");
+                continue;
+            }
+            if (['text','search'].indexOf(inp['type'].toLocaleLowerCase()) > -1){
+                // username
+                if (inp.name.indexOf('user') > -1){
+                    console.log('input username');
+                    // 这里可以传入用户名
+                    inp.value = 'what_ever_a';
+                }else if (inp.name.indexOf('email') > -1){
+                    // 传入邮箱
+                    inp.value = 'fakeuseremail@163.com';
+                }else if(inp.name.indexOf('phone') > -1){
+                    // 传入手机号
+                    inp.value = '13800008877';
+                }else{
+                    // 剩下的就可以随便了
+                    inp.value = 'test text';
+                }
+                
+            }else if (inp['type'] == 'password'){
+                inp.value = 'test password';
+            }
+        }
+    }
+        '''
+        await self.frame.evaluate(js_fillinput_str)
+
+    async def start(self):
+        await self.FetchBaseUrl()
+        await self.FetchAHref()
+        await self.FillInputAndSelect()
+
+        # frame input[type="buuton"]
+        input_button = await self.frame.querySelectorAll("input[type='button']")
+        for button in input_button:
+            await button.click() # after click found the on event
+            onevent = await get_event(self.frame) # {'onclick':[xxx,xxx], 'onmouseever':[xx,xx]}
+            for key in onevent:
+                if key.find('click') > -1:
+                    self.event.extend(onevent[key])
+
+
+        # click js func
+        for js_func in self.js_func_str:
+            await self.frame.evaluate(js_func)
+            onevent = await get_event(self.frame) # {'onclick':[xxx,xxx], 'onmouseever':[xx,xx]}
+            for key in onevent:
+                if key.find('click') > -1:
+                    self.event.extend(onevent[key])
+
+        self.event = list(set(self.event))
+        for func in self.event:
+            await self.frame.evaluate(func)
+
+
+        buttons = await self.frame.querySelectorAll("button")
+        for button in buttons:
+            # await asyncio.wait([
+            #     self.page.waitForNavigation(waitUntil='networkidle0'),
+            #     button.click(),
+            # ])
+            await button.click()
+            if self.frame.url != self.url:
+                print(self.frame.url + "frame.url")
+                print(self.url + "self.url")
+                # await asyncio.wait([
+                #     self.frame.waitForNavigation(waitUntil='networkidle0'),
+                #     self.frame.goBack(),
+                # ])
+                # await self.frame.goBack()
+
+
 
 
 
@@ -380,7 +407,9 @@ class HeadlessCrawler(object):
         self.executed_event = set() # 执行过的event
         self.requestd_url = set() # 请求过的url
         self.collected_url = set()
-        
+        self.urlqueue = asyncio.Queue()
+        self.fetched_url = {'static':[], 'xhr':[]}
+        self.pattern = set()
         
 
     async def _init_page(self):
@@ -416,49 +445,55 @@ class HeadlessCrawler(object):
                 await request.abort()
             else:
                 print('hooked Url: {}'.format(request.url))
-
-                self.requestd_url.add(request.url)
+                item = {'url': request.url, 'method': request.method, 'postData': request.postData}
+                self.requestd_url.add(json.dumps(item))
                 await request.continue_()
 
-    async def frame_deal(self, frame):
-        print("frame.title={}".format(await frame.title()))
-        print("frame.url={}".format(frame.url))
-        html = await frame.content()
-        # print(html)
-        (links, onevents, jsfunc) = await exec_events_a(frame, html, 'a')
-        for link in links:
-            self.collected_url.add(link)
-
-        print("links----------\n{}".format(links))
-        print("onevents----------\n{}".format(onevents))
-        print("jsfunc----------\n{}".format(jsfunc))
-        # print(self.collected_url)        
-
-        htmlhandle = await frame.querySelectorAll('a')
-        for i in htmlhandle:
-            await asyncio.wait([
-                frame.waitFor(selectorOrFunctionOrTimeout=3000),
-                i.click(),
-            ])
-            # print(dir(i))
-            # await i.click()
-            await get_event(frame)
-            # await i.click()
 
     async def test(self):
         try:
             await self._init_page()
-            await self.page.goto('http://10.127.21.237/wivet/pages/18.php', waitUntil='networkidle0')
+            await self.page.goto('http://10.127.21.237/wivet/pages/7.php', waitUntil='networkidle0')
             title = await self.page.title()
             print(title)
             await self.page.evaluate('console.log("console log hook test")')
             # fech a link
 
-            # frames = self.page.frames
-            # print(dir(frames[0]))
 
-            # for frame in frames:
-            #     await self.frame_deal(frame)
+
+            frames = self.page.frames
+            print(dir(frames[0]))
+            print("there total {} frames".format(len(frames)))
+            for frame in frames:
+                obj = FrameDeal(frame, self.fetched_url, self.urlqueue, self.pattern)
+                await obj.start()
+                print("after obj.start, self.fetched_url={}".format(self.fetched_url))
+
+            while not self.urlqueue.empty():
+                try:
+                    url = await self.urlqueue.get()
+                    print('-------------------------------------------\n')
+                    print('[URL]: {}'.format(url))
+                    print('-------------------------------------------\n')
+                    await self.page.goto(url, waitUntil='networkidle0')
+                    title = await self.page.title()
+                    print(title)
+                    await self.page.evaluate('console.log("console log hook test")')
+                    # fech a link
+
+                    frames = self.page.frames
+                    print(dir(frames[0]))
+                    print("there total {} frames".format(len(frames)))
+                    for frame in frames:
+                        obj = FrameDeal(frame, self.fetched_url, self.urlqueue, self.pattern)
+                        await obj.start()
+                        print("after obj.start, self.fetched_url={}".format(self.fetched_url))
+                except Exception as e:
+                    print("[Exception] [fetched_url.static] {}".format(repr(e)))
+
+            window_link = await self.page.evaluate('''()=>{return window.LINKS}''')
+            print('---------AT LAST, WINDOW.LINKS-------------')
+            print(window_link)
 
             # html = await self.page.content()
             # # print(html)
@@ -538,6 +573,7 @@ class HeadlessCrawler(object):
 async def main():
     a = HeadlessCrawler('http://testphp.vulnweb.com/AJAX/#')
     await a.test()
-    print(a.requestd_url)
+    with open('result.json', 'w') as f:
+        json.dump(list(a.requestd_url), f)
 
 asyncio.get_event_loop().run_until_complete(main())
