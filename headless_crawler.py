@@ -85,6 +85,7 @@ async def mutationobserver(page):
 
     }'''
 
+    # 这个函数只是劫持了window.location函数，并没有真正的去请求，所以request并没有Hook住这里的请求
     hook_windows = '''hook_window = ()=> {
         console.log('hook_window function executed!!!');
         window.Redirects = [];
@@ -119,7 +120,7 @@ async def mutationobserver(page):
     '''
     #print(dir(page))
     result = await page.evaluateOnNewDocument(hook_windows)
-    #result = await page.evaluate(jsfunc_str)
+    result = await page.evaluate(jsfunc_str)
     # jsfunc_str_exec = '''monitor()'''
     # result2 = await page.evaluate(jsfunc_str_exec)
     print('获取事件被触发后的节点属性变更更信息')
@@ -234,38 +235,6 @@ def md5(str):
     pass
 
 
-async def hook_window(page):
-    hook_window_location_str = '''hook_window = ()=>{
-        var oldLocation = window.location;
-        var fakeLocation = Object();
-        fakeLocation.replace = fakeLocation.assign = function (value) {
-            console.log("new link: " + value);
-        };
-        fakeLocation.reload = function () {};
-        fakeLocation.toString = function () {
-            return oldLocation.toString();
-        };
-        Object.defineProperties(fakeLocation, {
-            'href': {
-                'get': function () { return oldLocation.href; },
-                'set': function (value) { console.log("new link: " + value); }
-            },
-            // hash, host, hostname ...
-        });
-        var replaceLocation = function (obj) {
-            Object.defineProperty(obj, 'location', {
-                'get': function () { return fakeLocation; },
-                'set': function (value) { console.log("new link: " + value); }
-            });
-        };
-
-        replaceLocation(window);
-        addEventListener('DOMContentLoaded', function () {
-            replaceLocation(document);
-        })
-    }
-    '''
-    await page.evaluate(hook_window_location_str)
 
 
 class FrameDeal(object):
@@ -307,7 +276,7 @@ class FrameDeal(object):
             final_url = self.scheme  + ':' + url
         elif url.startswith('/'): # /test.php
             final_url = self.based_url.rstrip('/') + url
-        # elif url.startswith(".."): # ../test.php
+        # elif url.startswith(".."): # ../../test.php
         #     rindex = self.based_url.rindex('/')
         #     final_url = self.based_url[:rindex+1] + url
         else: # test.php, ../test.php
@@ -413,12 +382,6 @@ class FrameDeal(object):
         await self.FetchBaseUrl()
         await self.FetchAHref()
         await self.FillInputAndSelect()
-        first_event =  await get_event(self.frame)
-        print("first event")
-        print(first_event)
-        for key in first_event:
-            values = first_event[key]
-            self.event.extend(values)
 
 
         # frame input[type="buuton"]
@@ -447,19 +410,17 @@ class FrameDeal(object):
 
         buttons = await self.frame.querySelectorAll("button")
         for button in buttons:
-            # await asyncio.wait([
-            #     self.page.waitForNavigation(waitUntil='networkidle0'),
-            #     button.click(),
-            # ])
             await button.click()
             if self.frame.url != self.url:
                 print(self.frame.url + "frame.url")
                 print(self.url + "self.url")
                 # await asyncio.wait([
                 #     self.frame.waitForNavigation(waitUntil='networkidle0'),
-                #     self.frame.goBack(),
-                # ])
-                # await self.frame.goBack()
+
+        first_event =  await get_event(self.frame)
+        for key in first_event:
+            values = first_event[key]
+            self.event.extend(values)
 
 
 
@@ -480,8 +441,9 @@ class HeadlessCrawler(object):
         self.requestd_url = set() # 请求过的url
         self.collected_url = set()
         self.urlqueue = asyncio.Queue()
-        self.fetched_url = {'static':[], 'xhr':[]}
+        self.fetched_url = {'static':[], 'xhr':[]} # 所有的URL都放这里
         self.pattern = set()
+        self.parsed_url = urlparse.urlparse(url)
 
 
     async def _init_page(self):
@@ -522,10 +484,29 @@ class HeadlessCrawler(object):
                 await request.continue_()
 
 
+    def validUrl(self, url):
+
+        final_url = ''
+        if url.startswith('http://') or url.startswith('https://'): # http://www.iqiyi.com
+            final_url = url
+        elif url.startswith('//'):  # //www.iqiyi.com
+            final_url = self.scheme  + ':' + url
+        elif url.startswith('/'): # /test.php
+            final_url = self.url.rstrip('/') + url
+        else: # test.php, ../test.php
+            # origin_path = self.parsed_url.path
+            # target_path = os.path.join(origin_path, url)
+            rindex = self.url.rindex('/')
+            # final_url = self.parsed_url.scheme + "://" + self.parsed_url.netloc + target_path
+            final_url = self.url[:rindex+1] + url
+
+        return final_url
+
+
     async def test(self):
         try:
             await self._init_page()
-            await self.page.goto('http://10.127.21.237/wivet/pages/9.php', waitUntil='networkidle0')
+            await self.page.goto(self.url, waitUntil='networkidle0')
             #await self.page.goto('http://baidu.com', waitUntil='networkidle0')
             title = await self.page.title()
             print(title)
@@ -537,18 +518,27 @@ class HeadlessCrawler(object):
             print(event)
             for key in event:
                 for value in event[key]:
-                    print("value={}".format(value))
+                    # print("value={}".format(value))
                     await self.page.evaluate(value)
             print('in page, we found event like above')
 
+            # found all event and execute them
+            window_location_redirects = await self.page.evaluate("()=>{return window.Redirects;}")
+            window_location_redirects = list(set(window_location_redirects))
+            for link in window_location_redirects:
+                self.fetched_url['xhr'].append(self.validUrl(link))
 
+            print("after event execute: self.fetched_url={}".format(self.fetched_url))
+
+
+            # parsed the frame in pages
             frames = self.page.frames
             #print(dir(frames[0]))
             print("there total {} frames".format(len(frames)))
             for frame in frames:
                 obj = FrameDeal(frame, self.fetched_url, self.urlqueue, self.pattern)
                 await obj.start()
-                event = obj.event
+                event = list(set(obj.event))
                 for e in event:
                     await self.page.evaluate(e)
                 print("after obj.start, self.fetched_url={}".format(self.fetched_url))
@@ -566,18 +556,20 @@ class HeadlessCrawler(object):
                     # fech a link
 
                     frames = self.page.frames
-                    print(dir(frames[0]))
                     print("there total {} frames".format(len(frames)))
                     for frame in frames:
                         obj = FrameDeal(frame, self.fetched_url, self.urlqueue, self.pattern)
                         await obj.start()
+                        event = list(set(obj.event))
+                        for e in event:
+                            await self.page.evaluate(e)
                         print("after obj.start, self.fetched_url={}".format(self.fetched_url))
                 except Exception as e:
                     print("[Exception] [fetched_url.static] {}".format(repr(e)))
 
-            window_link = await self.page.evaluate('''()=>{return window.LINKS}''')
-            print('---------AT LAST, WINDOW.LINKS-------------')
-            print(window_link)
+            # window_link = await self.page.evaluate('''()=>{return window.LINKS}''')
+            # print('---------AT LAST, WINDOW.LINKS-------------')
+            # print(window_link)
 
             # html = await self.page.content()
             # # print(html)
@@ -585,77 +577,19 @@ class HeadlessCrawler(object):
             # for link in links:
             #     self.collected_url.add(link)
 
-            # print("links----------\n{}".format(links))
-            # print("onevents----------\n{}".format(onevents))
-            # print("jsfunc----------\n{}".format(jsfunc))
-            # print(self.collected_url)
-            # htmlhandle = await self.page.querySelectorAll('a')
-            # for i in htmlhandle:
-            #     # await asyncio.wait([
-            #     #     self.page.waitForNavigation(waitUntil='networkidle0'),
-            #     #     i.click(),
-            #     # ])
-            #     print(dir(i))
-            #     await i.click()
-            #     await get_event(self.page)
-            #     # await i.click()
-            #     print(await self.page.evaluate('''function(){return window.nodes}''', force_expr=False))
-
-            # print(await self.page.evaluate('''function(){return window.LINKS}''', force_expr=False))
-
+    
             print('--------click all a tag done-----------')
             # await self._close()
             await self.page.close()
-            # html = await page.content()
-            # (links, onevents, jsfunc) = await exec_events_a(page, html, 'a')
-            # print(links)
-            # print(onevents)
-            # print(jsfunc)
-            # for item in onevents:
-            #     #htmlhandle = await page.querySelector("{}[{}*={}]".format(item['tagname'], item['oneventname'], item['oneventvalue']))
-            #     #await htmlhandle.click()
-            #     await asyncio.wait([
-            #         page.waitForNavigation(waitUntil='networkidle0'),
-            #         page.evaluate(item['oneventvalue'])
-            #         ])
-
-            # for item in jsfunc:
-            #     await asyncio.wait([
-            #         page.waitForNavigation(waitUntil='networkidle0'),
-            #         page.evaluate(item)
-            #         ])
-
-            # print('------------execute jsfunc done-----------')
-            # print('------------reload html-----------')
-            # html = await page.content()
-            # (links, onevents, jsfunc) = await exec_events_a(page, html, 'a')
-            # print(links)
-            # print(onevents)
-            # print(jsfunc)
-
-            # print('--------evaluate done---------------')
+  
         except Exception as e:
             print('[test] [Error] {}'.format(repr(e)))
             exc_type, exc_value, exc_traceback_obj = sys.exc_info()
             traceback.print_tb(exc_traceback_obj)
             # traceback.print_exception(e)
-        '''
-        htmlhandle = await page.querySelectorAll('a')
-        print(dir(htmlhandle[0]))
-        for i in htmlhandle:
-            a_properties = await i.getProperties()
-            print('a_properties------------------------')
-            print(a_properties)
-            a_executionContent = i.executionContext
-            print('---------------------')
-            print(a_executionContent)
-        '''
-
-        #print(elements)
-        #print(dir(elements))
 
 async def main():
-    a = HeadlessCrawler('http://testphp.vulnweb.com/AJAX/#')
+    a = HeadlessCrawler('http://10.127.21.237/wivet/')
     await a.test()
     with open('result.json', 'w') as f:
         json.dump(list(a.requestd_url), f)
