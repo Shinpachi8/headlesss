@@ -41,53 +41,85 @@ async def mutationobserver(page):
     # dismiss the dialog
     # result = await page.evaluate('''()=>123123''')
     jsfunc_str = '''monitor=()=>{
-    window.EVENTS = [];
-    window.EVENTS_HISTORY = [];
-    window.LINKS = [];
-    window.nodes = [];
-    var MutationObserver = window.MutationObserver;
-    var callback = function (records) {
-        records.forEach(function (record) {
-            console.info('Mutation type: ', record.type);
-            if (record.type === 'attributes') {
-                console.info("Mutation attributes:", record.target[record.attributeName]);
-                window.LINKS.push(record.target[record.attributeName]);
-            } else if (record.type === 'childList') {
-                for (var i = 0; i < record.addedNodes.length; ++i) {
-                    var node = record.addedNodes[i];
-                    if (node.src || node.href) {
-                        window.LINKS.push(node.src || node.href);
-                        console.info('Mutation AddedNodes:', node.src || node.href);
+        window.EVENTS = [];
+        window.EVENTS_HISTORY = [];
+        window.LINKS = [];
+        window.nodes = [];
+        var MutationObserver = window.MutationObserver;
+        var callback = function (records) {
+            records.forEach(function (record) {
+                console.info('Mutation type: ', record.type);
+                if (record.type === 'attributes') {
+                    console.info("Mutation attributes:", record.target[record.attributeName]);
+                    window.LINKS.push(record.target[record.attributeName]);
+                } else if (record.type === 'childList') {
+                    for (var i = 0; i < record.addedNodes.length; ++i) {
+                        var node = record.addedNodes[i];
+                        if (node.src || node.href) {
+                            window.LINKS.push(node.src || node.href);
+                            console.info('Mutation AddedNodes:', node.src || node.href);
 
+                    }
                 }
+            }});
+        };
+        var option = {
+            'childList': true,
+            'subtree': true,
+            'attributes': true,
+            'attributeFilter': ['href', 'src']
+        };
+        var mo = new MutationObserver(callback);
+        mo.observe(document, option);
+
+        Element.prototype._addEventListener = Element.prototype.addEventListener;
+        Element.prototype.addEventListener = function (a, b, c) {
+            var hash = a + this.tagName + '|' + this.className + '|' + this.id + '|' + this.tabIndex;
+            if (window.EVENTS_HISTORY.indexOf(hash) < 0) {
+                window.EVENTS.push({"event": a, "element": this});
+                window.EVENTS_HISTORY.unshift(hash);
+                console.info('addEventListener:', a, this);
             }
-        }});
-    };
-    var option = {
-        'childList': true,
-        'subtree': true,
-        'attributes': true,
-        'attributeFilter': ['href', 'src']
-    };
-    var mo = new MutationObserver(callback);
-    mo.observe(document, option);
+            this._addEventListener(a, b, c);
+        };
 
-    Element.prototype._addEventListener = Element.prototype.addEventListener;
-    Element.prototype.addEventListener = function (a, b, c) {
-        var hash = a + this.tagName + '|' + this.className + '|' + this.id + '|' + this.tabIndex;
-        if (window.EVENTS_HISTORY.indexOf(hash) < 0) {
-            window.EVENTS.push({"event": a, "element": this});
-            window.EVENTS_HISTORY.unshift(hash);
-            console.info('addEventListener:', a, this);
-        }
-        this._addEventListener(a, b, c);
-    };
+    }'''
 
-}
+    hook_windows = '''hook_window = ()=> {
+        console.log('hook_window function executed!!!');
+        window.Redirects = [];
+        var oldLocation = window.location;
+        var fakeLocation = Object();
+        fakeLocation.replace = fakeLocation.assign = function (value) {
+            console.log("new link: " + value);
+        };
+        fakeLocation.reload = function () {};
+        fakeLocation.toString = function () {
+            return oldLocation.toString();
+        };
+        Object.defineProperties(fakeLocation, {
+            'href': {
+                'get': function () { return oldLocation.href; },
+                'set': function (value) {window.Redirects.push(value); console.log("new link: " + value); }
+            },
+            // hash, host, hostname ...
+        });
+        var replaceLocation = function (obj) {
+            Object.defineProperty(obj, 'location', {
+                'get': function () { return fakeLocation; },
+                'set': function (value) {window.Redirects.push(value); console.log("new link: " + value); }
+            });
+        };
+
+        replaceLocation(window);
+        addEventListener('DOMContentLoaded', function () {
+            replaceLocation(document);
+        })
+    }
     '''
-    print('dirpage')
-    print(dir(page))
-    result = await page.evaluate(jsfunc_str)
+    #print(dir(page))
+    result = await page.evaluateOnNewDocument(hook_windows)
+    #result = await page.evaluate(jsfunc_str)
     # jsfunc_str_exec = '''monitor()'''
     # result2 = await page.evaluate(jsfunc_str_exec)
     print('获取事件被触发后的节点属性变更更信息')
@@ -202,6 +234,38 @@ def md5(str):
     pass
 
 
+async def hook_window(page):
+    hook_window_location_str = '''hook_window = ()=>{
+        var oldLocation = window.location;
+        var fakeLocation = Object();
+        fakeLocation.replace = fakeLocation.assign = function (value) {
+            console.log("new link: " + value);
+        };
+        fakeLocation.reload = function () {};
+        fakeLocation.toString = function () {
+            return oldLocation.toString();
+        };
+        Object.defineProperties(fakeLocation, {
+            'href': {
+                'get': function () { return oldLocation.href; },
+                'set': function (value) { console.log("new link: " + value); }
+            },
+            // hash, host, hostname ...
+        });
+        var replaceLocation = function (obj) {
+            Object.defineProperty(obj, 'location', {
+                'get': function () { return fakeLocation; },
+                'set': function (value) { console.log("new link: " + value); }
+            });
+        };
+
+        replaceLocation(window);
+        addEventListener('DOMContentLoaded', function () {
+            replaceLocation(document);
+        })
+    }
+    '''
+    await page.evaluate(hook_window_location_str)
 
 
 class FrameDeal(object):
@@ -210,7 +274,7 @@ class FrameDeal(object):
     '''
     def __init__(self, frame, fetched_url, urlqueue, pattern, timeout=10): # timeout暂定
         self.frame = frame
-        self.fetched_url = fetched_url # {'static':'不触发JS时的链接', 'xhr': 'js触发的链接'} 
+        self.fetched_url = fetched_url # {'static':'不触发JS时的链接', 'xhr': 'js触发的链接'}
         self.event = []
         self.js_func_str = set()
         self.url = frame.url
@@ -336,7 +400,7 @@ class FrameDeal(object):
                     // 剩下的就可以随便了
                     inp.value = 'test text';
                 }
-                
+
             }else if (inp['type'] == 'password'){
                 inp.value = 'test password';
             }
@@ -349,6 +413,13 @@ class FrameDeal(object):
         await self.FetchBaseUrl()
         await self.FetchAHref()
         await self.FillInputAndSelect()
+        first_event =  await get_event(self.frame)
+        print("first event")
+        print(first_event)
+        for key in first_event:
+            values = first_event[key]
+            self.event.extend(values)
+
 
         # frame input[type="buuton"]
         input_button = await self.frame.querySelectorAll("input[type='button']")
@@ -361,6 +432,7 @@ class FrameDeal(object):
 
 
         # click js func
+        print("self.js_func_str.length={}".format(len(self.js_func_str)))
         for js_func in self.js_func_str:
             await self.frame.evaluate(js_func)
             onevent = await get_event(self.frame) # {'onclick':[xxx,xxx], 'onmouseever':[xx,xx]}
@@ -368,9 +440,9 @@ class FrameDeal(object):
                 if key.find('click') > -1:
                     self.event.extend(onevent[key])
 
-        self.event = list(set(self.event))
-        for func in self.event:
-            await self.frame.evaluate(func)
+        #self.event = list(set(self.event))
+        #for func in self.event:
+        #    await self.frame.evaluate(func)
 
 
         buttons = await self.frame.querySelectorAll("button")
@@ -397,7 +469,7 @@ class FrameDeal(object):
 class HeadlessCrawler(object):
     '''
     this class aim to use headless chrome to spider some website
-    based on python3.6 and pyppeteer 
+    based on python3.6 and pyppeteer
     '''
     def __init__(self, url, cookies=None):
         '''
@@ -410,15 +482,15 @@ class HeadlessCrawler(object):
         self.urlqueue = asyncio.Queue()
         self.fetched_url = {'static':[], 'xhr':[]}
         self.pattern = set()
-        
+
 
     async def _init_page(self):
         try:
-            self.brower = await connect(browserWSEndpoint='ws://127.0.0.1:9222/devtools/browser/a920d29f-f918-4a65-9899-1807e3cd8e24')
+            self.brower = await connect(browserWSEndpoint='ws://10.127.21.237:9223/devtools/browser/c73da7a4-e186-4ffe-954e-cbfbd5d581f6')
             self.page = await self.brower.newPage()
             await self.page.setRequestInterception(True)
+            #self.page.on('domcontentloaded', await hook_window(self.page))
             self.page.on('load',await mutationobserver(self.page))
-            await get_event(self.page)
             self.page.on('dialog', dismiss_dialog)
             self.page.on('request', self.hook_request)
             self.page.on('console', hook_console)
@@ -440,7 +512,7 @@ class HeadlessCrawler(object):
         if request.resourceType in ['image', 'media', 'websocket']:
             await request.abort()
         else:
-            
+
             if request.url in self.requestd_url:
                 await request.abort()
             else:
@@ -453,20 +525,32 @@ class HeadlessCrawler(object):
     async def test(self):
         try:
             await self._init_page()
-            await self.page.goto('http://10.127.21.237/wivet/pages/7.php', waitUntil='networkidle0')
+            await self.page.goto('http://10.127.21.237/wivet/pages/9.php', waitUntil='networkidle0')
+            #await self.page.goto('http://baidu.com', waitUntil='networkidle0')
             title = await self.page.title()
             print(title)
             await self.page.evaluate('console.log("console log hook test")')
             # fech a link
+            print('--------after title-----------')
 
+            event = await get_event(self.page)
+            print(event)
+            for key in event:
+                for value in event[key]:
+                    print("value={}".format(value))
+                    await self.page.evaluate(value)
+            print('in page, we found event like above')
 
 
             frames = self.page.frames
-            print(dir(frames[0]))
+            #print(dir(frames[0]))
             print("there total {} frames".format(len(frames)))
             for frame in frames:
                 obj = FrameDeal(frame, self.fetched_url, self.urlqueue, self.pattern)
                 await obj.start()
+                event = obj.event
+                for e in event:
+                    await self.page.evaluate(e)
                 print("after obj.start, self.fetched_url={}".format(self.fetched_url))
 
             while not self.urlqueue.empty():
