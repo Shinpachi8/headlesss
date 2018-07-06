@@ -448,7 +448,7 @@ class HeadlessCrawler(object):
 
     async def _init_page(self):
         try:
-            self.brower = await connect(browserWSEndpoint='ws://10.127.21.237:9223/devtools/browser/c73da7a4-e186-4ffe-954e-cbfbd5d581f6')
+            self.brower = await connect(browserWSEndpoint='ws://10.127.21.237:9223/devtools/browser/cdcc188f-d810-44a8-9b60-0ef1d92cc6ba')
             self.page = await self.brower.newPage()
             await self.page.setRequestInterception(True)
             #self.page.on('domcontentloaded', await hook_window(self.page))
@@ -538,6 +538,8 @@ class HeadlessCrawler(object):
             for frame in frames:
                 obj = FrameDeal(frame, self.fetched_url, self.urlqueue, self.pattern)
                 await obj.start()
+                # update the set
+                self.pattern.update(obj.pattern)
                 event = list(set(obj.event))
                 for e in event:
                     await self.page.evaluate(e)
@@ -593,5 +595,7 @@ async def main():
     await a.test()
     with open('result.json', 'w') as f:
         json.dump(list(a.requestd_url), f)
+    with open('fetched_url.json', 'w') as f:
+        json.dump((a.fetched_url), f)
 
 asyncio.get_event_loop().run_until_complete(main())
