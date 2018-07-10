@@ -1,6 +1,30 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+
+import re
+import json
+import socket
+import string
+import urllib
+import logging
+import requests.packages.urllib3
+import hashlib
+import time
+try:
+    import httplib
+except:
+    import http.client as httplib
+import ssl
+try:
+    import urlparse
+except:
+    from urllib import parse as urlparse
+import random
+import requests
+from requests import  ConnectTimeout
+
+
 STATIC_EXT = ["f4v","bmp","bz2","css","doc","eot","flv","gif"]
 STATIC_EXT += ["gz","ico","jpeg","jpg","js","less","mp3", "mp4"]
 STATIC_EXT += ["pdf","png","rar","rtf","swf","tar","tgz","txt","wav","woff","xml","zip"]
@@ -139,6 +163,16 @@ class TURL(object):
         else:
             return False
 
+    def is_block_host(self):
+        """
+        judge if the path in black_list_host
+        """
+        for p in BLACK_LIST_HOST:
+            if p in self.host:
+                return True
+        else:
+            return False
+
     def url_string(self):
         data = (self.scheme, self.netloc, self.path, self.params, self.query, self.fragment)
         url = urlparse.urlunparse(data)
@@ -171,4 +205,41 @@ def LogUtil(path='/tmp/test.log', name='test'):
     return logger
 
 
-logger = LogUtil()
+# logger = LogUtil()
+
+def is_http(url, port=None):
+    """
+    judge if the url is http service
+    :url  the host, like www.iqiyi.com, without scheme
+    """
+    if port is None: port = 80
+    service = ''
+    try:
+        conn = httplib.HTTPConnection(url, port, timeout=10)
+        conn.request('HEAD', '/')
+        conn.close()
+        service = 'http'
+    except Exception as e:
+        #print "[lib.common] [is_http] {}".format(repr(e))
+        pass
+
+    return service
+
+def is_https(url, port=None):
+    """
+    judge if the url is https request
+    :url  the host, like www.iqiyi.com, without scheme
+    """
+    ssl._create_default_https_context = ssl._create_unverified_context
+    if port is None: port = 443
+    service = ''
+    try:
+        conn = httplib.HTTPSConnection(url, port, timeout=10)
+        conn.request('HEAD', '/')
+        conn.close()
+        service = 'https'
+    except Exception as e:
+        #print "[lib.common] [is_http] {}".format(repr(e))
+        pass
+
+    return service

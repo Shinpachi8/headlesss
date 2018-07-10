@@ -1,265 +1,123 @@
 import asyncio
-import pyppeteer
 import time
-from pyppeteer.launcher import connect
-from pyppeteer import launch
-from bs4 import BeautifulSoup as bs
-from pyee import EventEmitter
+import re
+import json
+from asyncio import Queue
+# from bs4 import BeautifulSoup as bs
+from lib.headlesscrower import HeadlessCrawler
+from lib.commons import TURL
 #from pyppeteer.network_manager import Request
 
-'''
-cookie = {'_ga': 'GA1.2.1789303611.1527950632',
-    '_gh_sess':     'a0MrNVVTU1BHcGRzcTlhRFUrY0hUS3hEVXd4Q1cwNGdrSjJhREFNcmIzVUR2VitHVVRVS2NPUGxFU3NIaENYV1F5NU44WndpT3NvanNZMWZPUFRKSDZ1SVROT0JtbTFaMzZDM0RTQ0p6K2swR1RtdUdkallWRlVPcVZWNThucjJYcms1UjRXZjRkNGlFSDNkcXFpb3ZYUlBvSmpmeW9sTFRtMlluRXduN05JQ2I1T244T2dIRVBkWlcxZWxzMWJTWUJsdHgrOGhhakhrMDdyTXFIUlo5WmVFRlZ0TVpmend3U2o5RCtqSE05U1hFanlpeFJvTU9wdFNaODVNQlllcWRWWnA2Ujh3eWpIcEhacDRqM0RXS0d2blJ2Y2hzMmUwNkFkcUs2ZXYybUlRVUZnQmxlYk5JL3dSOGNtbzVZdHkwaU96bkJQU3lXN3pLdTljb2FvWWNnPT0tLTRPUElrZ3FSenUyVHNFTC9lejBPeFE9PQ%3D%3D--eef41280eaaad02932850454ed45288c1194bf94',
-    '_octo': 'GH1.1.727260551.1527950632',
-    'dotcom_user': 'Shinpachi8',
-    'logged_in': 'yes',
-    'user_session': 'NqtE4KhUYKb_p8ib1W2XhRgTDNBmt78ZaOYSySh_QL6u9M4Q'}
-'''
-
-cookie = [{'name': 'logged_in', 'value': 'yes'}, {'name': '_ga', 'value': 'GA1.2.1789303611.1527950632'}, {'name': '_octo', 'value': 'GH1.1.727260551.1527950632'}, {'name': 'user_session', 'value': 'NqtE4KhUYKb_p8ib1W2XhRgTDNBmt78ZaOYSySh_QL6u9M4Q'}, {'name': 'dotcom_user', 'value': 'Shinpachi8'}, {'name': '_gh_sess', 'value':
-    'a0MrNVVTU1BHcGRzcTlhRFUrY0hUS3hEVXd4Q1cwNGdrSjJhREFNcmIzVUR2VitHVVRVS2NPUGxFU3NIaENYV1F5NU44WndpT3NvanNZMWZPUFRKSDZ1SVROT0JtbTFaMzZDM0RTQ0p6K2swR1RtdUdkallWRlVPcVZWNThucjJYcms1UjRXZjRkNGlFSDNkcXFpb3ZYUlBvSmpmeW9sTFRtMlluRXduN05JQ2I1T244T2dIRVBkWlcxZWxzMWJTWUJsdHgrOGhhakhrMDdyTXFIUlo5WmVFRlZ0TVpmend3U2o5RCtqSE05U1hFanlpeFJvTU9wdFNaODVNQlllcWRWWnA2Ujh3eWpIcEhacDRqM0RXS0d2blJ2Y2hzMmUwNkFkcUs2ZXYybUlRVUZnQmxlYk5JL3dSOGNtbzVZdHkwaU96bkJQU3lXN3pLdTljb2FvWWNnPT0tLTRPUElrZ3FSenUyVHNFTC9lejBPeFE9PQ%3D%3D--eef41280eaaad02932850454ed45288c1194bf94'}]
 
 
-ee = EventEmitter()
-@ee.on('onclick')
-async def eeclick(page, jsstr):
-    await page.evaluate(jsstr)
-
-async def mutationobserver(page):
-    '''
-    mutation observer the dom change
-    '''
-    # dismiss the dialog
-    # result = await page.evaluate('''()=>123123''')
-    jsfunc_str = '''monitor=()=>{
-    window.EVENTS = [];
-    window.EVENTS_HISTORY = [];
-    window.LINKS = [];
-    window.nodes = [];
-    var MutationObserver = window.MutationObserver;
-    var callback = function (records) {
-        records.forEach(function (record) {
-            console.info('Mutation type: ', record.type);
-            if (record.type === 'attributes') {
-                console.info("Mutation attributes:", record.target[record.attributeName]);
-                window.LINKS.push(record.target[record.attributeName]);
-            } else if (record.type === 'childList') {
-                for (var i = 0; i < record.addedNodes.length; ++i) {
-                    var node = record.addedNodes[i];
-                    if (node.src || node.href) {
-                        window.LINKS.push(node.src || node.href);
-                        console.info('Mutation AddedNodes:', node.src || node.href);
-
-                }
-            }
-        }});
-    };
-    var option = {
-        'childList': true,
-        'subtree': true,
-        'attributes': true,
-        'attributeFilter': ['href', 'src']
-    };
-    var mo = new MutationObserver(callback);
-    mo.observe(document, option);
-
-    Element.prototype._addEventListener = Element.prototype.addEventListener;
-    Element.prototype.addEventListener = function (a, b, c) {
-        var hash = a + this.tagName + '|' + this.className + '|' + this.id + '|' + this.tabIndex;
-        if (window.EVENTS_HISTORY.indexOf(hash) < 0) {
-            window.EVENTS.push({"event": a, "element": this});
-            window.EVENTS_HISTORY.unshift(hash);
-            console.info('addEventListener:', a, this);
-        }
-        this._addEventListener(a, b, c);
-    };
-
-}
-    '''
-    print('dirpage')
-    print(dir(page))
-    result = await page.evaluate(jsfunc_str)
-    jsfunc_str_exec = '''monitor()'''
-    result2 = await page.evaluate(jsfunc_str_exec)
-    print('获取事件被触发后的节点属性变更更信息')
-    print(result)
-
-
-async def hook_request(request):
-    '''
-    hook the request, dont know if xmlhttprequest has been hooked
-    '''
-    if request.resourceType in ['image', 'media', 'websocket']:
-        await request.abort()
+def get_pattern(url):
+    if isinstance(url, TURL):
+        pass
     else:
-        print('hooked Url: {}'.format(request.url))
-        await request.continue_()
+        url = TURL(url)
+    query = url.get_query
+    pattern = re.sub(r'\d+', '{digit}', query)
+    url.query = pattern
+    url = url.url_string()
+    return url
 
 
-async def hook_response(resp):
-    print("resp.url = {}".format(resp.url))
+async def test(wsaddr, url):
+    # 2018-07-09 先写单线程，再写成生产者和消费者
+    request_set = Queue()
+    pattern_set = set()
+    unrequest_set = Queue()
 
+    a = HeadlessCrawler(wsaddr, url)
+    await a.spider()
+    # print(a.collect_url)
+    for url in a.collect_url:
+        # u = url['url']
+        # u = TURL(u)
+        # if u.is_ext_static() or u.is_block_path() or u.is_block_host():
+        #     # 静态文件，黑名单路径，黑名单的host
+        #     continue
+        # pattern = get_pattern(u)
+        # if pattern in pattern_set:
+        #     continue
+        # else:
+        #     pattern_set.add(pattern)
+        # if 'request' in url:
+        #     request_set.put(url)
+        # else:
+        await unrequest_set.put(url)
 
-async def dismiss_dialog(dialog):
-    print("dialog found")
-    await dialog.accept()
-
-async def exec_events_a(page, html, tag):
-    #a_handle = await page.querySelectorAll('a')
-    soup = bs(html, 'html.parser')
-    a_tag = soup.find_all(tag)
-
-    links = []
-    onevents = []
-    jsfunc = []
-    for a in a_tag:
-        print('-----------------------')
-        # pass the logout likes
-        if 'logout' in a:
+    depth = 0
+    print("[now] [lenth of unrequest_set] =======  {}".format(unrequest_set.qsize()))
+    while not unrequest_set.empty():
+        # print("[now] [lenth of unrequest_set] =======  {}".format(unrequest_set.qsize()))
+        url = await unrequest_set.get()
+        depth = int(url['depth'])
+        if depth > 3:
             continue
-        #print(dir(a))
+        else:
+            depth += 1
+        url = url['url']
+        pattern = get_pattern(url)
+        if pattern in pattern_set:
+            print("found pattern, igore URL： {}".format(u))
+            continue
+        else:
+            pattern_set.add(pattern)
 
-        attrs = a.attrs
-        for key in attrs:
-            if key in ['href', 'src']:
-                if attrs[key] in ['javascript:void(0)', '#']:
-                    # ignore the void press
-                    continue
-                elif attrs[key].startswith('http'):
-                    # judge if the attrs][key] is valid through a function like : validurl()
-                    links.append(attrs[key])
-                else:
-                    jsfunc.append(attrs[key])
-            elif key.startswith('on'):
-                classname = attrs['class'] if 'calss' in attrs else ''
-                idname = attrs['id'] if 'id' in attrs else ''
-                oneventname = key
-                uniq_events = {'classname': classname, 'idname': idname, 'oneventname': oneventname, 'tagname': 'a', 'oneventvalue': attrs[key] }
-                onevents.append(uniq_events)
 
-                #if key == 'onclick':
-                #    ee.emit(page, attrs[key])
-                #    print('ee click')
-            else:
+        a = HeadlessCrawler(wsaddr, url, depth=depth)
+        await a.spider()
+        print("===========================================\n")
+        print("url: {}".format(url))
+        print("len_of_a.collect_url:  {}".format(len(a.collect_url)))
+        print("===========================================\n")
+        for url in a.collect_url:
+            u = url['url']
+            if u.startswith('javascript') or u.startswith("about"):
+                continue
+            u = TURL(u)
+            if u.is_ext_static():
+                print("u.is_ext_static: {}".format(u))
+                continue
+            elif u.is_block_path():
+                print("u.is_block_path: {}".format(u))
+                continue
+            elif u.is_block_host():
+                print("u.is_block_host: {}".format(u))
                 continue
 
-    return (links, onevents, jsfunc)
+            
+            # print('pattern==={}'.format(pattern))
+            if 'request' in url:
+                await request_set.put(url)
+                print("[now] [lenth of request_set] =======  {}".format(request_set.qsize()))
+            else:
+                await unrequest_set.put(url)
 
 
 
+    print("========done=========")
+    all_url = []
+    while not request_set.empty():
+        _ = await request_set.get()
+        all_url.append(_)
+    
+    with open('result.json', 'w') as f:
+        json.dump(all_url, f)
 
-async def get_event(page):
-    js_getevent_func = '''get_event = ()=>{
-    nodes = document.all;
-    for(j = 0;j < nodes.length; j++) {
-        attrs = nodes[j].attributes;
-        for(k=0; k<attrs.length; k++) {
-            if (attrs[k].nodeName.startsWith('on')) {
-                console.log(attrs[k].nodeName, attrs[k].nodeValue);
-            }
-        }
-    }
-}
-    '''
-    result = await page.evaluate(js_getevent_func)
-    result = await page.evaluate('get_event()')
-    print('found something')
-    print(result)
-    return result
 
-async def hook_console(console):
-    print("console.text--------------")
-    print(console.text)
+
 
 
 
 
 async def main():
-    brower = await connect(browserWSEndpoint='ws://0.0.0.0:9222/devtools/browser/acfde542-a560-464e-bcb3-7ea19026c12d')
-    #brower = await launch()
-    #print(type(brower))
-    page = await brower.newPage()
-    await page.setRequestInterception(True)
-    page.on('load',await mutationobserver(page))
-    await get_event(page)
-    page.on('dialog', dismiss_dialog)
-    page.on('request', hook_request)
-    page.on('console', hook_console)
-    page.on('response', hook_response)
-    #await page.goto('https://github.com')
-    #await page.setCookie(*cookie)
-    #await page.goto('https://github.com/settings/emails', waitUntil='networkidle0')
-    #title = await page.title()
-    #print(title)
-    # test on testphp.vulnweb.com/AJAX/index.php
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/daff194a-35c9-448e-8aa7-97883931103b'
+    url = 'http://testphp.vulnweb.com/AJAX/index.php'
+    # with open('fetched_url.json', 'w') as f:
+    #     json.dump((a.fetched_url), f)
+    await test(wsaddr, url)
 
-    await page.goto('http://testphp.vulnweb.com/AJAX/index.php', waitUntil='networkidle0')
-    title = await page.title()
-    print(title)
-    await page.evaluate('console.log("console log hook test")')
-    htmlhandle = await page.querySelectorAll('a')
-    for i in htmlhandle:
-        await asyncio.wait([
-            page.waitForNavigation(waitUntil='networkidle0'),
-            i.click(),
-        ])
-        await i.click()
-        print(await page.evaluate('''()=> {return window.nodes}'''))
-
-    print(await page.evaluate('''()=> {return window.LINKS}'''))
-
-    print('--------click all a tag done-----------')
-
-    html = await page.content()
-    (links, onevents, jsfunc) = await exec_events_a(page, html, 'a')
-    print(links)
-    print(onevents)
-    print(jsfunc)
-    for item in onevents:
-        #htmlhandle = await page.querySelector("{}[{}*={}]".format(item['tagname'], item['oneventname'], item['oneventvalue']))
-        #await htmlhandle.click()
-        await asyncio.wait([
-            page.waitForNavigation(waitUntil='networkidle0'),
-            page.evaluate(item['oneventvalue'])
-            ])
-
-    for item in jsfunc:
-        await asyncio.wait([
-            page.waitForNavigation(waitUntil='networkidle0'),
-            page.evaluate(item)
-            ])
-
-    print('------------execute jsfunc done-----------')
-    print('------------reload html-----------')
-    html = await page.content()
-    (links, onevents, jsfunc) = await exec_events_a(page, html, 'a')
-    print(links)
-    print(onevents)
-    print(jsfunc)
-
-    print('--------evaluate done---------------')
-    '''
-    htmlhandle = await page.querySelectorAll('a')
-    print(dir(htmlhandle[0]))
-    for i in htmlhandle:
-        a_properties = await i.getProperties()
-        print('a_properties------------------------')
-        print(a_properties)
-        a_executionContent = i.executionContext
-        print('---------------------')
-        print(a_executionContent)
-    '''
-
-    #print(elements)
-    #print(dir(elements))
-    await elements[0].click()
-
-
-    time.sleep(3)
-    #await brower.close()
-    #page.close()
-    #brower.close()
-
-
-asyncio.get_event_loop().run_until_complete(main())
-
+if __name__ == '__main__':
+    asyncio.get_event_loop().run_until_complete(main())

@@ -11,15 +11,11 @@ from urllib import parse as urlparse
 import sys
 from pyppeteer.launcher import connect
 from pyppeteer import launch
+# from pyppeteer.network_manager import Response
 from bs4 import BeautifulSoup as bs
 from pyee import EventEmitter
 
 
-
-ee = EventEmitter()
-@ee.on('onclick')
-async def eeclick(page, jsstr):
-    await page.evaluate(jsstr)
 
 async def mutationobserver(page):
     '''
@@ -41,14 +37,23 @@ async def mutationobserver(page):
                     window.LINKS.push(record.target[record.attributeName]);
                 } else if (record.type === 'childList') {
                     for (var i = 0; i < record.addedNodes.length; ++i) {
+                        console.log(JSON.stringify(record.addedNodes[i]));
                         var node = record.addedNodes[i];
                         if (node.src || node.href) {
                             window.LINKS.push(node.src || node.href);
                             console.info('Mutation AddedNodes:', node.src || node.href);
-
+                            };
+                        var a_tag = record.addedNodes[i].querySelectorAll('a');
+                        for(var j = 0; j < a_tag.length; ++j){
+                            var node = a_tag[j];
+                            if (node.src || node.href) {
+                                window.LINKS.push(node.src || node.href);
+                                console.info('Mutation AddedNodes:', node.src || node.href);
+                                };
+                        }
                     }
                 }
-            }});
+            });
         };
         var option = {
             'childList': true,
@@ -75,6 +80,7 @@ async def mutationobserver(page):
     # 这个函数只是劫持了window.location函数，并没有真正的去请求，所以request并没有Hook住这里的请求
     hook_windows = '''hook_window = ()=> {
         console.log('hook_window function executed!!!');
+        //window.openlinks = [];
         window.Redirects = [];
         var oldLocation = window.location;
         var fakeLocation = Object();
@@ -105,9 +111,15 @@ async def mutationobserver(page):
         })
     }
     '''
+
+    # hook window.open function
+    hook_open = """() => {
+            window.open = function(url) { console.log(url);  window.Redirects.push(url); console.log(JSON.stringify(window.openlinks)); }
+            }"""
     #print(dir(page))
     result = await page.evaluateOnNewDocument(hook_windows)
-    result = await page.evaluate(jsfunc_str)
+    result = await page.evaluateOnNewDocument(jsfunc_str)
+    result = await page.evaluateOnNewDocument(hook_open)
     # jsfunc_str_exec = '''monitor()'''
     # result2 = await page.evaluate(jsfunc_str_exec)
     print('获取事件被触发后的节点属性变更更信息')
@@ -124,7 +136,8 @@ async def dismiss_dialog(dialog):
     print("dialog found")
     await dialog.accept()
 
-
+async def hook_error(error):
+    print("error found:  {}".format(error))
 
 async def get_event(page):
     js_getevent_func = '''get_event = ()=>{
@@ -133,7 +146,7 @@ async def get_event(page):
     for(j = 0;j < nodes.length; j++) {
         attrs = nodes[j].attributes;
         for(k=0; k<attrs.length; k++) {
-            if (attrs[k].nodeName.startsWith('on')) {
+            if (attrs[k].nodeName.startsWith('on') || attrs[k].nodeName.startsWith('javascript')) {
                 if(attrs[k].nodeName in event){
                     if(attrs[k].nodeValue in event[attrs[k].nodeName]){
                         console.log(attrs[k].nodeName, attrs[k].nodeValue + ' Already Add in List');
@@ -151,6 +164,7 @@ async def get_event(page):
 }
     '''
     result = await page.evaluate(js_getevent_func)
+    print("js_getevent_func = {}".format(result))
     result = json.loads(result)
     # result = await page.evaluate('get_event()')
     # print('found something')
@@ -160,6 +174,7 @@ async def get_event(page):
 async def hook_console(console):
     print("console.text--------------")
     print(console.text)
+    pass
 
 
 
@@ -173,7 +188,7 @@ class HeadlessCrawler(object):
     based on python3.6 and pyppeteer
     还没想好是hook response, 还是hook requests
     '''
-    def __init__(self, wsaddr, url, cookie=None):
+    def __init__(self, wsaddr, url, cookie=None, depth=1):
         '''
         后续可以添加访问黑名单,css,img,zip,and so on
         :param: wsaddr, ws地址，后期多个headless chrome，可以选择其中一个
@@ -203,6 +218,7 @@ class HeadlessCrawler(object):
         self.cookie = cookie # cookies
         self.wsaddr = wsaddr   # websocket addr
         self.event = [] # event 事件
+        self.depth = depth
         # print('self.wsaddr')
 
 
@@ -214,6 +230,7 @@ class HeadlessCrawler(object):
             #self.page.on('domcontentloaded', await hook_window(self.page))
             self.page.on('load',await mutationobserver(self.page))
             self.page.on('dialog', dismiss_dialog)
+            self.page.on('error', hook_error)
             self.page.on('request', self.hook_request)
             self.page.on('console', hook_console)
             self.page.on('response', hook_response)
@@ -227,21 +244,45 @@ class HeadlessCrawler(object):
         await self.page.close()
         # await self.brower.close()
 
+
+    def add_to_collect(self, item):
+        if item in self.collect_url:
+            pass
+        else:
+            self.collect_url.append(item)
+
+
+    async def FetchBaseUrl(self, html):
+        soup = bs(html, 'html.parser')
+        base_tags = soup.find_all('base')
+        for tag in base_tags:
+            if tag.has_attr('href'):
+                self.based_url = tag['href']
+                break
+        else:
+            self.based_url = self.url
+
+
     async def hook_request(self, request):
         '''
         hook the request, dont know if xmlhttprequest has been hooked
         '''
+        # print('request.redirectChain = {}'.format(request.redirectChain))
         if request.resourceType in ['image', 'media', 'websocket']:
             await request.abort()
         else:
-
             if request.url in self.crawled_url:
+                print("request.crawled_url={}".format(request.url))
                 await request.abort()
             else:
                 print('hooked Url: {}'.format(request.url))
-                item = {'url': request.url, 'method': request.method, 'data': request.postData, 'headers': request.headers, 'request':True}
-                self.collect_url.append((item))
-                await request.continue_()
+                item = {'depth': self.depth, 'url': request.url, 'method': request.method, 'data': request.postData, 'headers': request.headers, 'request':True}
+                self.add_to_collect(item)
+                await asyncio.gather(
+                    page.waitForNavigation(waitOptions),
+                    page.click(selector, clickOptions),
+                )
+                # await request.continue_()
 
 
     def validUrl(self, url):
@@ -258,7 +299,7 @@ class HeadlessCrawler(object):
         else: # test.php, ../test.php
             # origin_path = self.parsed_url.path
             # target_path = os.path.join(origin_path, url)
-            final_url = urlparse.urljoin(self.url, url)
+            final_url = urlparse.urljoin(self.based_url, url)
         return final_url
 
 
@@ -341,22 +382,25 @@ class HeadlessCrawler(object):
             if tag.has_attr('href'):
                 url = tag['href']
                 # pass the javascript:
-                if url.startswith('javascript') and url.find('javascript:void(0)') == -1:
-                    self.event.append(url)
+                if url.startswith('javascript'):
+                    print('url.startwith.javascript: {}'.format(url))
+                    await self.page.evaluate(url)
                     continue
                 url = self.validUrl(url)
                 if not self.sameOrign(url):
                     continue
                 # 这里的headers后续再完善
-                item = {'method': 'GET', 'headers':{}, 'data':None, 'url':url}
-                self.collect_url.append(item)
+                item = {'method': 'GET', 'headers':{}, 'data':None, 'url':url, 'depth': self.depth}
+                self.add_to_collect(item)
+
+
 
 
 
     async def spider(self):
         try:
             await self._init_page()
-            print('init page donw----------------------')
+            # print('init page donw----------------------')
             # 判断cookie的格式
             try:
                 if self.cookie is None:
@@ -378,9 +422,12 @@ class HeadlessCrawler(object):
             # 访问URL
             await self.page.goto(self.url, waitUntil='networkidle0')
 
+            await self.page.evaluate("loadSomething('artists.php');")
+            return
 
             # 首先获取a 中的href值，等到所有的事件都触发了，再收集一次
             html = await self.page.content()
+            await self.FetchBaseUrl(html)
             await self.getalllink(html)
 
             # 获取frame
@@ -388,12 +435,12 @@ class HeadlessCrawler(object):
             for frame in frames:
                 url = self.validUrl(frame.url)
                 if self.sameOrign(url):
-                    item = {'method': 'GET', 'data':None, 'headers':{}, 'url': url}
-                    self.collect_url.append(item)
+                    item = {'method': 'GET', 'data':None, 'headers':{}, 'url': url, 'depth': self.depth}
+                    self.add_to_collect(item)
 
-            print("---------------- frame done-------------------")
-            print(self.collect_url)
-            print("----------------------------------------------")
+            # print("---------------- frame done-------------------")
+            # print(self.collect_url)
+            # print("----------------------------------------------")
             # 获取事件:
             events = await get_event(self.page)
             for key in events:
@@ -403,9 +450,9 @@ class HeadlessCrawler(object):
             # 填充表单
             await self.FillInputAndSelect()
 
-            print("---------------- fill input done-------------------")
-            print(self.collect_url)
-            print("----------------------------------------------")
+            # print("---------------- fill input done-------------------")
+            # print(self.collect_url)
+            # print("----------------------------------------------")
             # 获取事件:
             events = await get_event(self.page)
             for key in events:
@@ -414,43 +461,68 @@ class HeadlessCrawler(object):
             # 点击button
             input_button = await self.page.querySelectorAll("input[type='button']")
             for button in input_button:
-                await button.click() # after click found the on event
+                
+                await button.press('ArrowLeft') # after click found the on event
 
             buttons = await self.page.querySelectorAll("button")
             for button in buttons:
-                await button.click()
+                # print(button)
+                await button.press('ArrowLeft')
 
 
             #  执行事件
             for e in self.event:
-                await self.page.evaluate(e)
+                # print(repr(e))
+                try:
+                    await self.page.evaluate(e)
+                except:
+                    pass 
 
-            print("---------------- event done-------------------")
-            print(self.collect_url)
-            print("----------------------------------------------")
+
+            # print("---------------- event done-------------------")
+            # print(self.collect_url)
+            # print("----------------------------------------------")
 
             # 获取dom变更的link
-            window_link = await self.page.evaluate('''()=>{return window.LINKS}''')
+            window_link = await self.page.evaluate('''()=>{return window.LINKS;}''')
             if window_link:
                 for link in window_link:
+                    if link is None:
+                        continue
+                    print("-----------------------")
+                    print(link)
+                    if link.startswith("javascript:"):
+                        await self.page.evaluate(link)
+                        continue
+                    if link.startswith("about:blank"):
+                        continue
                     url = self.validUrl(link)
                     if self.sameOrign(url):
-                        item = {'method': 'GET', 'headers':{}, 'url':url, 'data':None}
-                        self.collect_url.append(item)
+                        item = {'method': 'GET', 'headers':{}, 'url':url, 'data':None, 'depth': self.depth}
+                        self.add_to_collect(item)
 
             # 获取window.location的 link
-            window_locations = await self.page.evaluate('''()=>{return window.Redirects}''')
+            window_locations = await self.page.evaluate('''()=>{return window.Redirects;}''')
             if window_locations:
                 for link in window_locations:
+
+                    if link and link.startswith("javascript:"):
+                        await self.page.evaluate(link)
+                        continue
+                    if link and link.startswith("about:blank"):
+                        continue
+
                     url = self.validUrl(link)
                     if self.sameOrign(url):
-                        item = {'method': 'GET', 'headers':{}, 'url':url, 'data':None}
-                        self.collect_url.append(item)
+                        item = {'method': 'GET', 'headers':{}, 'url':url, 'data':None, 'depth': self.depth}
+                        self.add_to_collect(item)
 
+
+            html = await self.page.content()
+            await self.getalllink(html)
             print("---------------- dom, windows.location done-------------------")
             print(self.collect_url)
             print("----------------------------------------------")
-
             await self._close()
 
         except Exception as e:
@@ -462,9 +534,9 @@ class HeadlessCrawler(object):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/92bb659c-ea27-4278-90dc-a2164037d1fe'
-    a = HeadlessCrawler(wsaddr, 'http://10.127.21.237/wivet/pages/9.php')
-    await a.spider( )
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/daff194a-35c9-448e-8aa7-97883931103b'
+    a = HeadlessCrawler(wsaddr, 'http://testphp.vulnweb.com/AJAX/index.php')
+    await a.spider()
     test = a.collect_url
     test = [json.dumps(item) for item in test]
     with open('result.json', 'w') as f:
