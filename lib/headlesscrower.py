@@ -194,7 +194,7 @@ async def get_event(page):
         if(element.nodeName.toLowerCase() == 'a'){
             // check if has href attribute
             if(element.hasAttribute("href")){
-                console.log("href found: " + element.getAttribute('href'));
+                //console.log("href found: " + element.getAttribute('href'));
                 window.LINKS.push(element.getAttribute("href"));
             }
         }
@@ -439,7 +439,7 @@ class HeadlessCrawler(object):
                 url = tag['href']
                 # pass the javascript:
                 if url.startswith('javascript'):
-                    print('url.startwith.javascript: {}'.format(url))
+                    #print('url.startwith.javascript: {}'.format(url))
                     #await self.page.evaluate(url)
                     continue
                 url = self.validUrl(url)
@@ -544,7 +544,7 @@ class HeadlessCrawler(object):
             if window_link:
                 window_link = list(set(window_link))
                 for link in window_link:
-                    if link is None:
+                    if link is None or linke.strip() == '#':
                         continue
                     # print("---------link--------------")
                     # print(link)

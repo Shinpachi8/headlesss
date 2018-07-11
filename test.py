@@ -103,11 +103,12 @@ async def spider(wsaddr, url, taskname, cookie=None):
             redis_util.set_url_scanned(method, pattern_md5)
         else:
 
-            task = json.dumps(url)
-            # unscan_queue.put(task)
-            redis_util.insert_one_task(task)
-            # redis_util.set_url_scanned(method, pattern_md5)
-            # scanned_set.add(pattern + "|" + pattern_md5)
+            if redis_util.is_url_scanned(method, pattern_md5):
+                pass
+            else:
+                task = json.dumps(url)
+                redis_util.insert_one_task(task)
+                redis_util.set_url_scanned(method, pattern_md5)
 
     '''
     in_loop = asyncio.get_event_loop()
@@ -134,8 +135,6 @@ async def spider(wsaddr, url, taskname, cookie=None):
         pattern_md5 = hashmd5(pattern)
         method = url['method']
         # 如果扫过了
-        if redis_util.is_url_scanned(method, pattern_md5):
-            continue
         # if pattern + "|" + pattern_md5 in scanned_set:
         #     continue
 
@@ -173,14 +172,17 @@ async def spider(wsaddr, url, taskname, cookie=None):
                 count += 1
                 result = json.dumps(url)
                 result_queue.put(result)
-                
+
                 # # 插入结果，后续可以直接插入到Mongo里
                 redis_util.insert_result(result)
                 redis_util.set_url_scanned(method, pattern_md5)
             else:
-                task = json.dumps(url)
-                redis_util.insert_one_task(task)
-                redis_util.set_url_scanned(method, pattern_md5)
+                if redis_util.is_url_scanned(method, pattern_md5):
+                    pass
+                else:
+                    task = json.dumps(url)
+                    redis_util.insert_one_task(task)
+                    redis_util.set_url_scanned(method, pattern_md5)
                 # unscan_queue.put(task)
                 # scanned_set.add( pattern + "|" + pattern_md5)
 
@@ -193,7 +195,6 @@ async def spider(wsaddr, url, taskname, cookie=None):
 
     with open('fetched_url.json', 'w') as f:
         json.dump((result), f)
-    print(scanned_set)
 
 
 
