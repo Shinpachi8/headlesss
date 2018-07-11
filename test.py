@@ -79,7 +79,11 @@ async def spider(wsaddr, url, taskname, cookie=None):
     # 2018-07-09 先写单线程，再写成生产者和消费者
     conf = RedisConf(taskname, db=1)
     redis_util = RedisUtils(conf)
+    unscan_queue = Queue()
+    result_queue = Queue()
+    scanned_set = set()
 
+    count = 0
 
     a = HeadlessCrawler(wsaddr, url, cookie=cookie)
     await a.spider()
@@ -92,13 +96,18 @@ async def spider(wsaddr, url, taskname, cookie=None):
         if 'request' in url:
             result = json.dumps(url)
             method = url['method']
+            count += 1
+            result_queue.put(result)
             # 插入结果，后续可以直接插入到Mongo里
             redis_util.insert_result(result)
             redis_util.set_url_scanned(method, pattern_md5)
         else:
+
             task = json.dumps(url)
+            # unscan_queue.put(task)
             redis_util.insert_one_task(task)
-            redis_util.set_url_scanned(method, pattern_md5)
+            # redis_util.set_url_scanned(method, pattern_md5)
+            # scanned_set.add(pattern + "|" + pattern_md5)
 
     '''
     in_loop = asyncio.get_event_loop()
@@ -113,8 +122,10 @@ async def spider(wsaddr, url, taskname, cookie=None):
         # 或者redis的任务为0了,就可以退出了
         if redis_util.task_counts == 0:
             break
-
+        # if unscan_queue.empty():
+        #     break
         task = redis_util.fetch_one_task()
+        # task = unscan_queue.get()
         url = json.loads(task)
 
         '''判断是否扫过了已经'''
@@ -125,18 +136,21 @@ async def spider(wsaddr, url, taskname, cookie=None):
         # 如果扫过了
         if redis_util.is_url_scanned(method, pattern_md5):
             continue
+        # if pattern + "|" + pattern_md5 in scanned_set:
+        #     continue
 
         a = HeadlessCrawler(wsaddr, url['url'], cookie=cookie, depth=url['depth']+1)
         await a.spider()
         for url in a.collect_url:
             # 还可以判断一下url的类型
             depth = url['depth']
-            if depth > 4: # 超过四层就退出
+            if depth > 3: # 超过四层就退出
+                print("---------------depth > 3-------------")
                 continue
 
             u = url['url']
-            if u.startswith('javascript') or u.startswith('about') or '@' in u:
-                continue
+            # if u.startswith('javascript') or u.startswith('about') or '@' in u:
+            #     continue
             # 判断URL是否被block了
             try:
                 tu = TURL(u)
@@ -150,20 +164,36 @@ async def spider(wsaddr, url, taskname, cookie=None):
             pattern_md5 = hashmd5(pattern)
             method = url['method']
             # 如果扫过了
-            if redis_util.is_url_scanned(method, pattern_md5):
-                continue
+            # if redis_util.is_url_scanned(method, pattern_md5):
+            #     continue
+            # if pattern + "|" + pattern_md5 in scanned_set:
+            #     continue
 
             if 'request' in url:
+                count += 1
                 result = json.dumps(url)
-                # 插入结果，后续可以直接插入到Mongo里
+                result_queue.put(result)
+                
+                # # 插入结果，后续可以直接插入到Mongo里
                 redis_util.insert_result(result)
-                #redis_util.set_url_scanned(method, pattern_md5)
+                redis_util.set_url_scanned(method, pattern_md5)
             else:
                 task = json.dumps(url)
                 redis_util.insert_one_task(task)
+                redis_util.set_url_scanned(method, pattern_md5)
+                # unscan_queue.put(task)
+                # scanned_set.add( pattern + "|" + pattern_md5)
 
     print("-----------done------")
+    result = []
+    print('totle count: {}'.format(count))
+    while not result_queue.empty():
+        s = (result_queue.get())
+        result.append(s)
 
+    with open('fetched_url.json', 'w') as f:
+        json.dump((result), f)
+    print(scanned_set)
 
 
 

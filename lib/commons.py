@@ -187,7 +187,7 @@ class TURL(object):
 
 def LogUtil(path='/tmp/test.log', name='test'):
     logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
 
     #create formatter
     formatter = logging.Formatter(fmt=u'[%(asctime)s] [%(levelname)s] [%(funcName)s] %(message)s ')

@@ -53,10 +53,10 @@ class UrlPattern(object):
             path = path.replace(ext, '')
 
         # 这三个应该够了
-        flags = '/_-'
+        flags = '/_-,.'
         path = unquote(path)
         dirs = path.split('/')
-        print(dirs)
+        # print(dirs)
         for d in dirs:
             if not d:
                 continue
@@ -65,7 +65,7 @@ class UrlPattern(object):
                 if flag in d:
                     has_flag = True
                     split_dir = d.split(flag)
-                    print(split_dir)
+                    # print(split_dir)
                     tmp_pattern  = []
                     for s in split_dir:
                         if not s:
@@ -89,8 +89,11 @@ class UrlPattern(object):
                     pattern.append('{no_ascii}')
                 else:
                     pattern.append(d)
-        s = '/'.join(pattern) + ext
-        print(s)
+        if ext:
+            s = '/'.join(pattern) + ext
+        else:
+            s = '/'.join(pattern)
+        # print(s)
         return s
 
     def get_pattern(self):

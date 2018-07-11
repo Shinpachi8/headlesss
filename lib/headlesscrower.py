@@ -501,6 +501,7 @@ class HeadlessCrawler(object):
                 self.event.extend(events[key])
 
 
+
             # 填充表单
             await self.FillInputAndSelect()
 
@@ -512,6 +513,7 @@ class HeadlessCrawler(object):
             for key in events:
                 self.event.extend(events[key])
 
+            self.event = list(set(self.event))
             # 点击button
             input_button = await self.page.querySelectorAll("input[type='button']")
             for button in input_button:
@@ -553,7 +555,7 @@ class HeadlessCrawler(object):
                             print("exec {} failed".format(repr(e)))
 
                         continue
-                    if link.startswith("about:blank"):
+                    if link.startswith("about") or link.startswith('mailto'):
                         continue
                     url = self.validUrl(link)
                     if self.sameOrign(url):
@@ -573,7 +575,7 @@ class HeadlessCrawler(object):
                             print("exec {} failed".format(repr(e)))
 
                         continue
-                    if link and link.startswith("about:blank"):
+                    if link and link.startswith("about") or link.startswith('mailto'):
                         continue
 
                     url = self.validUrl(link)

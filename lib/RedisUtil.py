@@ -6,8 +6,10 @@ Copyright (c) 2016-2017 twi1ight@t00ls.net (http://twi1ight.com/)
 See the file 'doc/COPYING' for copying permission
 """
 import redis
+import logging
 from lib.commons import LogUtil
 
+logging.getLogger('pypputeer').setLevel(logging.INFO)
 logger = LogUtil()
 
 class RedisConf(object):
