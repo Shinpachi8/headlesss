@@ -440,7 +440,7 @@ class HeadlessCrawler(object):
                 # pass the javascript:
                 if url.startswith('javascript'):
                     print('url.startwith.javascript: {}'.format(url))
-                    await self.page.evaluate(url)
+                    #await self.page.evaluate(url)
                     continue
                 url = self.validUrl(url)
                 if not self.sameOrign(url):
