@@ -6,16 +6,21 @@ Copyright (c) 2016-2017 twi1ight@t00ls.net (http://twi1ight.com/)
 See the file 'doc/COPYING' for copying permission
 """
 import redis
+from lib.commons import LogUtil
+
+logger = LogUtil()
 
 class RedisConf(object):
-    def __init__(self, taskname, db=0):
+    def __init__(self, taskname, host='127.0.0.1', port=6379, password='', db=0):
         self.db = db
         self.taskname = taskname
+        self.host = host
+        self.port = port
+        self.password = password
         self.task_result = taskname + ':result'
         self.task_scanned = taskname + ':scanned'
         self.task_unscan = taskname + ':unscan'
         self.task_pattern = taskname + ':pattern'
-        self.
 
 
 
@@ -33,7 +38,7 @@ class RedisUtils(object):
         self.h_url_scanned = conf.task_scanned
         self.h_url_pattern = conf.task_pattern
         self.redis_client = None
-        self.connect()
+        self.connect(conf)
 
     @property
     def connected(self):
@@ -44,10 +49,10 @@ class RedisUtils(object):
             logger.exception('connect to redis failed!')
             return False
 
-    def connect(self):
+    def connect(self, conf):
         try:
-            self.redis_client = redis.StrictRedis(host=RedisConf.host, port=RedisConf.port,
-                                                  db=self.db, password=RedisConf.password,
+            self.redis_client = redis.StrictRedis(host=conf.host, port=conf.port,
+                                                  db=self.db, password=conf.password,
                                                   socket_keepalive=True)
         except:
             logger.exception('connect redis failed!')
@@ -75,7 +80,7 @@ class RedisUtils(object):
         :param timeout: default 0, block mode
         :return:
         """
-        return self.redis_client.lpush(self.l_url_result, timeout)
+        return self.redis_client.lpop(self.l_url_result)
 
     @property
     def result_counts(self):
@@ -96,15 +101,15 @@ class RedisUtils(object):
 
 
 
-    def set_url_scanned(self, mehtod, pattern):
+    def set_url_scanned(self, method, pattern):
         """
         :param url: URL class instance
         :return:
         """
-        key = '{}/{}'.format(mehtod, pattern)
+        key = '{}/{}'.format(method, pattern)
         self.redis_client.hsetnx(self.h_url_scanned, key, '*')
 
-    def is_url_scanned(self, mehtod, pattern):
+    def is_url_scanned(self, method, pattern):
         """
         :param url: URL class instance
         :return:

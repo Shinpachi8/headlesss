@@ -245,5 +245,9 @@ def is_https(url, port=None):
     return service
 
 def hashmd5(string):
+    try:
+        string = string.encode('utf-8')
+    except:
+        string = string
     return md5(string).hexdigest()
 

@@ -10,6 +10,10 @@ try:
 except:
     from urllib.parse import unquote
 
+try:
+    from urllib import urlencode
+except:
+    from urllib.parse import urlencode
 
 def isascii(s):
     return all([ord(i) < 128 for i in s])
@@ -23,7 +27,7 @@ class UrlPattern(object):
         query = self.parsed_url.query
         if not query:
             return ''
-        
+
         query_dict = dict(urlparse.parse_qsl(query))
         for key in query_dict:
             # if int
@@ -37,8 +41,8 @@ class UrlPattern(object):
                 query_dict[key] = '{ascii}'
             else:
                 query_dict[key] = '{no_ascii}'
-        return urllib.urlencode(query_dict)
-    
+        return urlencode(query_dict)
+
 
     def get_path_pattern(self):
         path = self.parsed_url.path
@@ -47,9 +51,9 @@ class UrlPattern(object):
         if '.' in path:
             ext = path[path.rindex('.'):]
             path = path.replace(ext, '')
-  
+
         # 这三个应该够了
-        flags = '/_-' 
+        flags = '/_-'
         path = unquote(path)
         dirs = path.split('/')
         print(dirs)
@@ -76,8 +80,8 @@ class UrlPattern(object):
                             tmp_pattern.append('{no_ascii}')
                         else:
                             tmp_pattern.append(s)
-                    pattern.append(flag.join(tmp_pattern)) 
-                    
+                    pattern.append(flag.join(tmp_pattern))
+
             if not has_flag:
                 if d.isdigit():
                     pattern.append('{digit}')

@@ -138,7 +138,7 @@ async def mutationobserver(page):
                 arguments[1] = 0;
                 return window.__originalSetInterval.apply(this, arguments);
             };
-            
+
             }"""
     #print(dir(page))
     await page.evaluateOnNewDocument(hook_windows)
@@ -232,7 +232,7 @@ class HeadlessCrawler(object):
         '''
         后续可以添加访问黑名单,css,img,zip,and so on
         :param: wsaddr, ws地址，后期多个headless chrome，可以选择其中一个
-        :param: url, 待爬取URL, 
+        :param: url, 待爬取URL,
         :param: cookie, 待爬取URL的cookie, 格式如下, 可通过EditThisCookie chrome插件来导出
                 [
                 {
@@ -288,7 +288,9 @@ class HeadlessCrawler(object):
 
 
     def add_to_collect(self, item):
-        if item in self.collect_url:
+        if (item['url'].find('javascript') > -1) or (item['url'].find('about') > -1) or (item['url'].find('mailto') > -1):
+            pass
+        elif item in self.collect_url:
             pass
         else:
             self.collect_url.append(item)
@@ -513,7 +515,7 @@ class HeadlessCrawler(object):
             # 点击button
             input_button = await self.page.querySelectorAll("input[type='button']")
             for button in input_button:
-                
+
                 await button.press('ArrowLeft') # after click found the on event
 
             buttons = await self.page.querySelectorAll("button")
@@ -538,6 +540,7 @@ class HeadlessCrawler(object):
             # 获取dom变更的link
             window_link = await self.page.evaluate('''()=>{return window.LINKS;}''')
             if window_link:
+                window_link = list(set(window_link))
                 for link in window_link:
                     if link is None:
                         continue
@@ -560,6 +563,7 @@ class HeadlessCrawler(object):
             # 获取window.location的 link
             window_locations = await self.page.evaluate('''()=>{return window.Redirects;}''')
             if window_locations:
+                window_locations = list(set(window_locations))
                 for link in window_locations:
 
                     if link and link.startswith("javascript:"):
