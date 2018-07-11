@@ -2,24 +2,108 @@ import asyncio
 import time
 import re
 import json
-from asyncio import Queue
+import threading
+from queue import Queue
+from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
 from lib.headlesscrower import HeadlessCrawler
-from lib.commons import TURL
+from lib.commons import TURL, hashmd5
+from lib.UrlDeDuplicate import UrlPattern
 #from pyppeteer.network_manager import Request
 
 
 
-def get_pattern(url):
-    if isinstance(url, TURL):
-        pass
-    else:
-        url = TURL(url)
-    query = url.get_query
-    pattern = re.sub(r'\d+', '{digit}', query)
-    url.query = pattern
-    url = url.url_string()
-    return url
+class SpiderWork(threading.Thread):
+    '''spider work'''
+    def __init__(self, conf, wsaddr, cookie=None):
+        threading.Thread.__init__(self)
+        self.conf = conf
+        self.wsaddr = wsaddr
+        self.cookie = cookie
+        # self.redis_util = RedisUtil(conf)
+
+    async def run(self):
+        redis_util = RedisUtil(conf)
+        while True:
+            # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
+            # 或者redis的任务为0了,就可以退出了
+            if redis_util.task_counts == 0:
+                break
+
+            task = redis_util.fetch_on_task()
+            url = json.loads(task)
+            a = HeadlessCrawler(wsaddr, url['url'], cookie=cookie)
+            await a.spider()
+            for url in a.collect_url:
+                # 还可以判断一下url的类型
+                depth = url['depth']
+                if depth > 4: # 超过四层就退出
+                    continue
+
+                u = url['url']
+                # 判断URL是否被block了
+                if u.is_block_host() or u.is_block_path() or u.is_ext_static():
+                    continue
+
+                pattern = UrlPattern(u).get_pattern()
+                pattern_md5 = hashmd5(pattern)
+                method = url['method']
+                # 如果扫过了
+                if redis_util.is_url_scanned(method, pattern_md5):
+                    continue
+
+                if 'request' in url:
+                    result = json.dumps(url)
+                    # 插入结果，后续可以直接插入到Mongo里
+                    redis_util.insert_result(result)
+                    redis_util.set_url_scanned(method, pattern_md5)
+                else:
+                    task = json.dumps(url)
+                    redis_util.insert_one_task(task)
+
+
+
+async def spider(wsadr, url, taskname, cookie=None):
+    # 2018-07-09 先写单线程，再写成生产者和消费者
+    conf = RedisConf(taskname)
+    redis_util = RedisUtils(conf)
+
+
+    a = HeadlessCrawler(wsaddr, url, cookie=cookie)
+    await a.spider()
+    # print(a.collect_url)
+    for url in a.collect_url:
+        # 还可以判断一下url的类型
+        u = url['url']
+        pattern = UrlPattern(u).get_pattern()
+        pattern_md5 = hashmd5(pattern)
+        if 'request' in url:
+            result = json.dumps(url)
+            method = url['method']
+            # 插入结果，后续可以直接插入到Mongo里
+            redis_util.insert_result(result)
+            redis_util.set_url_scanned(method, pattern_md5)
+        else:
+            task = json.dumps(url)
+            redis_util.insert_one_task(task)
+
+    # 多线程跑一下？
+    threads = []
+    for i in xrange(10):
+        thread = SpiderWork(conf, wsaddr, cookie=cookie)
+        threads.append(thread)
+
+    for i in threads:
+        i.setDaemon(True)
+        i.start()
+
+    while threading.active_count() > 1:
+        time.sleep(10)
+
+    print("-----------done------")
+
+
+
 
 
 async def test(wsaddr, url):
@@ -113,11 +197,11 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/daff194a-35c9-448e-8aa7-97883931103b'
-    url = 'http://testphp.vulnweb.com/AJAX/index.php'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/fac57600-3af2-4526-9794-b1db97b28de5'
+    url = 'http://www.iqiyi.com/'
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
-    await test(wsaddr, url)
+    await spider(wsaddr, url, 'iqiyi')
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())

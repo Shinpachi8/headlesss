@@ -23,7 +23,7 @@ async def mutationobserver(page):
     '''
     # dismiss the dialog
     # result = await page.evaluate('''()=>123123''')
-    jsfunc_str = '''monitor=()=>{
+    jsfunc_str = '''()=>{
         window.EVENTS = [];
         window.EVENTS_HISTORY = [];
         window.LINKS = [];
@@ -31,24 +31,27 @@ async def mutationobserver(page):
         var MutationObserver = window.MutationObserver;
         var callback = function (records) {
             records.forEach(function (record) {
-                console.info('Mutation type: ', record.type);
-                if (record.type === 'attributes') {
+                //console.info('Mutation type: ', record.type);
+                if (record.type == 'attributes') {
                     console.info("Mutation attributes:", record.target[record.attributeName]);
                     window.LINKS.push(record.target[record.attributeName]);
-                } else if (record.type === 'childList') {
+                } else if (record.type == 'childList') {
                     for (var i = 0; i < record.addedNodes.length; ++i) {
-                        console.log(JSON.stringify(record.addedNodes[i]));
+                        //console.log("recode.addedNodes[i]", record.addedNodes[i].innerHTML);
                         var node = record.addedNodes[i];
                         if (node.src || node.href) {
                             window.LINKS.push(node.src || node.href);
                             console.info('Mutation AddedNodes:', node.src || node.href);
                             };
+
+
                         var a_tag = record.addedNodes[i].querySelectorAll('a');
+
                         for(var j = 0; j < a_tag.length; ++j){
-                            var node = a_tag[j];
-                            if (node.src || node.href) {
-                                window.LINKS.push(node.src || node.href);
-                                console.info('Mutation AddedNodes:', node.src || node.href);
+                            var a = a_tag[j];
+                            if (a.src || a.href) {
+                                window.LINKS.push(a.src || a.href);
+                                //console.log('Mutation AddedNodes:', a.src || a.href);
                                 };
                         }
                     }
@@ -79,7 +82,7 @@ async def mutationobserver(page):
 
     # 这个函数只是劫持了window.location函数，并没有真正的去请求，所以request并没有Hook住这里的请求
     hook_windows = '''hook_window = ()=> {
-        console.log('hook_window function executed!!!');
+        //console.log('hook_window function executed!!!');
         //window.openlinks = [];
         window.Redirects = [];
         var oldLocation = window.location;
@@ -112,19 +115,38 @@ async def mutationobserver(page):
     }
     '''
 
-    # hook window.open function
+    # hook window.open function，防止别人hook
+    # 设置时间为0
     hook_open = """() => {
-            window.open = function(url) { console.log(url);  window.Redirects.push(url); console.log(JSON.stringify(window.openlinks)); }
+
+            window.open = function(url) { console.log('hook before defineProperty'); };
+            Object.defineProperty(window, 'open', {
+                value: window.open,
+                writable: false,
+                configurable: false,
+                enumerable: true
+            });
+            window.open = function(url) { console.log(url);  window.Redirects.push(url); console.log(JSON.stringify(window.openlinks)); };
+
+            window.__originalSetTimeout = window.setTimeout;
+            window.setTimeout = function() {
+                arguments[1] = 0;
+                return window.__originalSetTimeout.apply(this, arguments);
+            };
+            window.__originalSetInterval = window.setInterval;
+            window.setInterval = function() {
+                arguments[1] = 0;
+                return window.__originalSetInterval.apply(this, arguments);
+            };
+            
             }"""
     #print(dir(page))
-    result = await page.evaluateOnNewDocument(hook_windows)
-    result = await page.evaluateOnNewDocument(jsfunc_str)
-    result = await page.evaluateOnNewDocument(hook_open)
+    await page.evaluateOnNewDocument(hook_windows)
+    await page.evaluateOnNewDocument(jsfunc_str)
+    await page.evaluateOnNewDocument(hook_open)
     # jsfunc_str_exec = '''monitor()'''
     # result2 = await page.evaluate(jsfunc_str_exec)
     print('获取事件被触发后的节点属性变更更信息')
-    print(result)
-
 
 
 
@@ -142,24 +164,42 @@ async def hook_error(error):
 async def get_event(page):
     js_getevent_func = '''get_event = ()=>{
     var event = {};
-    var nodes = document.all;
-    for(j = 0;j < nodes.length; j++) {
-        attrs = nodes[j].attributes;
-        for(k=0; k<attrs.length; k++) {
-            if (attrs[k].nodeName.startsWith('on') || attrs[k].nodeName.startsWith('javascript')) {
-                if(attrs[k].nodeName in event){
-                    if(attrs[k].nodeValue in event[attrs[k].nodeName]){
-                        console.log(attrs[k].nodeName, attrs[k].nodeValue + ' Already Add in List');
+    var treeWalker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_ELEMENT,
+        { acceptNode: function(node) { return NodeFilter.FILTER_ACCEPT; } },
+        false
+    );
+    while(treeWalker.nextNode()) {
+        var element = treeWalker.currentNode
+        var attrs = element.getAttributeNames()
+        for(var i=0; i < attrs.length; i++){
+            var attr_name = attrs[i];
+            if(attr_name.startsWith("on")){
+                // 如果有这个事件
+                var attr_value = element.getAttribute(attr_name);
+                //console.log("attr_name: "+ attr_name + " VS attr_value: " + attr_value);
+                if(attr_name in event){
+                    if(attr_value in event[attr_name]){
+                        console.log("already add to event: " + attr_name + attr_value);
                     }else{
-                        event[attrs[k].nodeName].unshift(attrs[k].nodeValue);
+                        event[attr_name].push(attr_value);
                     }
                 }else{
-                    event[attrs[k].nodeName] = [];
-                    event[attrs[k].nodeName].unshift(attrs[k].nodeValue);
+                    event[attr_name] = [];
+                    event[attr_name].push(attr_value);
                 }
             }
         }
-    }
+        if(element.nodeName.toLowerCase() == 'a'){
+            // check if has href attribute
+            if(element.hasAttribute("href")){
+                console.log("href found: " + element.getAttribute('href'));
+                window.LINKS.push(element.getAttribute("href"));
+            }
+        }
+    };
+
     return JSON.stringify(event);
 }
     '''
@@ -219,6 +259,8 @@ class HeadlessCrawler(object):
         self.wsaddr = wsaddr   # websocket addr
         self.event = [] # event 事件
         self.depth = depth
+        self.headers = {}
+        self.scheme = urlparse.urlparse(self.url).scheme
         # print('self.wsaddr')
 
 
@@ -268,7 +310,17 @@ class HeadlessCrawler(object):
         hook the request, dont know if xmlhttprequest has been hooked
         '''
         # print('request.redirectChain = {}'.format(request.redirectChain))
-        if request.resourceType in ['image', 'media', 'websocket']:
+        image_raw_response = ('SFRUUC8xLjEgMjAwIE9LCkNvbnRlbnQtVHlwZTogaW1hZ2UvcG5nCgqJUE5HDQoaCgAAAA1JSERSAAAAAQ'
+                      'AAAAEBAwAAACXbVsoAAAAGUExURczMzP///9ONFXYAAAAJcEhZcwAADsQAAA7EAZUrDhsAAAAKSURBVAiZY'
+                      '2AAAAACAAH0cWSmAAAAAElFTkSuQmCC')
+        if request.resourceType == 'image':
+            print("request.recourceType=image, url={}".format(request.url))
+            await request.respond({
+                'status': 200,
+                'contentType': 'image/png',
+                'body': image_raw_response
+              })
+        elif request.resourceType in ['media', 'websocket']:
             await request.abort()
         else:
             if request.url in self.crawled_url:
@@ -276,13 +328,15 @@ class HeadlessCrawler(object):
                 await request.abort()
             else:
                 print('hooked Url: {}'.format(request.url))
+                if not self.headers:
+                    self.headers = request.headers
                 item = {'depth': self.depth, 'url': request.url, 'method': request.method, 'data': request.postData, 'headers': request.headers, 'request':True}
                 self.add_to_collect(item)
-                await asyncio.gather(
-                    page.waitForNavigation(waitOptions),
-                    page.click(selector, clickOptions),
-                )
-                # await request.continue_()
+                # await asyncio.gather(
+                #     self.page.waitForNavigation({"waitUntil":"networkidle0"}),
+                #     request.continue_()
+                # )
+                await request.continue_()
 
 
     def validUrl(self, url):
@@ -390,7 +444,7 @@ class HeadlessCrawler(object):
                 if not self.sameOrign(url):
                     continue
                 # 这里的headers后续再完善
-                item = {'method': 'GET', 'headers':{}, 'data':None, 'url':url, 'depth': self.depth}
+                item = {'method': 'GET', 'headers':self.headers, 'data':None, 'url':url, 'depth': self.depth}
                 self.add_to_collect(item)
 
 
@@ -420,22 +474,20 @@ class HeadlessCrawler(object):
                 return
 
             # 访问URL
-            await self.page.goto(self.url, waitUntil='networkidle0')
+            await self.page.goto(self.url, {'waitUntil':'load'})
 
-            await self.page.evaluate("loadSomething('artists.php');")
-            return
 
             # 首先获取a 中的href值，等到所有的事件都触发了，再收集一次
             html = await self.page.content()
             await self.FetchBaseUrl(html)
-            await self.getalllink(html)
+            # await self.getalllink(html)
 
             # 获取frame
             frames = self.page.frames
             for frame in frames:
                 url = self.validUrl(frame.url)
                 if self.sameOrign(url):
-                    item = {'method': 'GET', 'data':None, 'headers':{}, 'url': url, 'depth': self.depth}
+                    item = {'method': 'GET', 'data':None, 'headers':self.headers, 'url': url, 'depth': self.depth}
                     self.add_to_collect(item)
 
             # print("---------------- frame done-------------------")
@@ -474,9 +526,9 @@ class HeadlessCrawler(object):
             for e in self.event:
                 # print(repr(e))
                 try:
-                    await self.page.evaluate(e)
+                    await self.page.waitForFunction(e, {"timeout": 5000})
                 except:
-                    pass 
+                    print("exec {} failed".format(repr(e)))
 
 
             # print("---------------- event done-------------------")
@@ -489,16 +541,20 @@ class HeadlessCrawler(object):
                 for link in window_link:
                     if link is None:
                         continue
-                    print("-----------------------")
-                    print(link)
+                    # print("---------link--------------")
+                    # print(link)
                     if link.startswith("javascript:"):
-                        await self.page.evaluate(link)
+                        try:
+                            await self.page.waitForFunction(link, {"timeout": 5000})
+                        except:
+                            print("exec {} failed".format(repr(e)))
+
                         continue
                     if link.startswith("about:blank"):
                         continue
                     url = self.validUrl(link)
                     if self.sameOrign(url):
-                        item = {'method': 'GET', 'headers':{}, 'url':url, 'data':None, 'depth': self.depth}
+                        item = {'method': 'GET', 'headers':self.headers, 'url':url, 'data':None, 'depth': self.depth}
                         self.add_to_collect(item)
 
             # 获取window.location的 link
@@ -507,22 +563,26 @@ class HeadlessCrawler(object):
                 for link in window_locations:
 
                     if link and link.startswith("javascript:"):
-                        await self.page.evaluate(link)
+                        try:
+                            await self.page.waitForFunction(link, {"timeout": 5000})
+                        except:
+                            print("exec {} failed".format(repr(e)))
+
                         continue
                     if link and link.startswith("about:blank"):
                         continue
 
                     url = self.validUrl(link)
                     if self.sameOrign(url):
-                        item = {'method': 'GET', 'headers':{}, 'url':url, 'data':None, 'depth': self.depth}
+                        item = {'method': 'GET', 'headers':self.headers, 'url':url, 'data':None, 'depth': self.depth}
                         self.add_to_collect(item)
 
 
             html = await self.page.content()
             await self.getalllink(html)
-            print("---------------- dom, windows.location done-------------------")
-            print(self.collect_url)
-            print("----------------------------------------------")
+            # print("---------------- dom, windows.location done-------------------")
+            # print(self.collect_url)
+            # print("----------------------------------------------")
             await self._close()
 
         except Exception as e:
@@ -533,15 +593,15 @@ class HeadlessCrawler(object):
 
 
 
-async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/daff194a-35c9-448e-8aa7-97883931103b'
-    a = HeadlessCrawler(wsaddr, 'http://testphp.vulnweb.com/AJAX/index.php')
-    await a.spider()
-    test = a.collect_url
-    test = [json.dumps(item) for item in test]
-    with open('result.json', 'w') as f:
-        json.dump(list(set(test)), f)
-    # with open('fetched_url.json', 'w') as f:
-    #     json.dump((a.fetched_url), f)
+# async def main():
+#     wsaddr = 'ws://10.127.21.237:9223/devtools/browser/3e4028b0-6e0a-4f97-86ec-b1f0ed0fd612'
+#     a = HeadlessCrawler(wsaddr, 'http://www.iqiyi.com/')
+#     await a.spider()
+#     test = a.collect_url
+#     test = [json.dumps(item) for item in test]
+#     with open('result.json', 'w') as f:
+#         json.dump(list(set(test)), f)
+#     # with open('fetched_url.json', 'w') as f:
+#     #     json.dump((a.fetched_url), f)
 
-asyncio.get_event_loop().run_until_complete(main())
+# asyncio.get_event_loop().run_until_complete(main())

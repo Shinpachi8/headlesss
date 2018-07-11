@@ -9,8 +9,8 @@ import string
 import urllib
 import logging
 import requests.packages.urllib3
-import hashlib
 import time
+from hashlib import md5
 try:
     import httplib
 except:
@@ -243,3 +243,7 @@ def is_https(url, port=None):
         pass
 
     return service
+
+def hashmd5(string):
+    return md5(string).hexdigest()
+
