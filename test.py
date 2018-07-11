@@ -130,10 +130,10 @@ async def spider(wsaddr, url, taskname, cookie=None):
         url = json.loads(task)
 
         '''判断是否扫过了已经'''
-        u = url['url']
-        pattern = UrlPattern(u).get_pattern()
-        pattern_md5 = hashmd5(pattern)
-        method = url['method']
+        #u = url['url']
+        #pattern = UrlPattern(u).get_pattern()
+        #pattern_md5 = hashmd5(pattern)
+        #method = url['method']
         # 如果扫过了
         # if pattern + "|" + pattern_md5 in scanned_set:
         #     continue
