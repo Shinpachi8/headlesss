@@ -128,11 +128,11 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     in_loop.close()
     '''
     tasks = (
-        (worker, conf, wsaddr, cookie=cookie, domain=domain)
-        (worker, conf, wsaddr, cookie=cookie, domain=domain)
-        (worker, conf, wsaddr, cookie=cookie, domain=domain)
-        (worker, conf, wsaddr, cookie=cookie, domain=domain)
-        (worker, conf, wsaddr, cookie=cookie, domain=domain)
+        (worker, conf, wsaddr, cookie, domain)
+        (worker, conf, wsaddr, cookie, domain)
+        (worker, conf, wsaddr, cookie, domain)
+        (worker, conf, wsaddr, cookie, domain)
+        (worker, conf, wsaddr, cookie, domain)
     )
     c = AdvancedConcurrencyManager(tasks, n_process=2, n_threads=5, n_tasks=10)
 	c.run()
