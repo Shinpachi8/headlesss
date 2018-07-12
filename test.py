@@ -292,7 +292,7 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/df8fc9c1-551d-40c2-9c1c-ba12b57b785d'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/d7707dac-b9c1-4397-bdbd-9ae147f4cfc8'
     url = 'http://www.iqiyi.com/'
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
