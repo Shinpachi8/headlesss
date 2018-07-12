@@ -25,7 +25,7 @@ async def worker(redis_util, wsaddr, cookie=None, domain=''):
         url = json.loads(task)
         # 同源
         u = url['url']
-        print("fetched Form Redis: {}".format(u))
+        print("=========================fetched Form Redis\n: {}==================".format(u))
         if not sameOrigin(u, domain):
             continue
         
@@ -53,6 +53,7 @@ async def worker(redis_util, wsaddr, cookie=None, domain=''):
                 redis_util.set_url_scanned(method, pattern_md5)
             else:
                 if redis_util.is_url_scanned(method, pattern_md5):
+                    print("[Pattern Found] [{}]".format(pattern))
                     pass
                 else:
                     task = json.dumps(url)

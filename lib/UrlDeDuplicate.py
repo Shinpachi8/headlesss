@@ -18,6 +18,12 @@ except:
 def isascii(s):
     return all([ord(i) < 128 for i in s])
 
+def ishash(s):
+    h = '0123456789abcdef'
+    s = s.lower()
+    return all([(i in h) for i in s])
+
+
 class UrlPattern(object):
     def __init__(self, url):
         self.url = url
@@ -87,6 +93,8 @@ class UrlPattern(object):
                     pattern.append('{digit}')
                 elif not isascii(d):
                     pattern.append('{no_ascii}')
+                elif ishash(d):
+                    pattern.append('{hash}')
                 else:
                     pattern.append(d)
         if ext:

@@ -475,7 +475,7 @@ class HeadlessCrawler(object):
                 return
 
             # 访问URL
-            await self.page.goto(self.url, {'waitUntil':'load'})
+            await self.page.goto(self.url, {'waitUntil':'load', 'timeout':10000})
 
 
             # 首先获取a 中的href值，等到所有的事件都触发了，再收集一次
