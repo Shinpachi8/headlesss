@@ -12,10 +12,6 @@ from lib.UrlDeDuplicate import UrlPattern
 #from pyppeteer.network_manager import Request
 
 
-#loop = asyncio.get_event_loop()
-
-
-
 async def worker(conf, wsaddr, cookie=None):
     redis_util = RedisUtils(conf)
     while True:
@@ -73,6 +69,17 @@ async def worker(conf, wsaddr, cookie=None):
                 redis_util.set_url_scanned(method, pattern_md5)
 
 
+def sameOrigin(url, domain):
+    try:
+        turl = TURL(u)
+        assert turl.netloc == domain
+        assert turl.is_block_host() == False, 'is block host'
+        assert turl.is_block_path() == False, 'is block path'
+        assert turl.is_ext_static() == False, 'is static extention'
+        return True
+    except Exception as e:
+        print(repr(e))
+        return False
 
 
 async def spider(wsaddr, url, taskname, cookie=None, goon=False):
@@ -82,8 +89,10 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     unscan_queue = Queue()
     result_queue = Queue()
     scanned_set = set()
-
-    count = 0
+    domain = TURL(url).netloc
+    # count = 0
+    # 设置domain
+    redis_util.set_task_domain(domain)
 
     if not goon:
         print("start from new url.....")
@@ -93,18 +102,19 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
         for url in a.collect_url:
             # 还可以判断一下url的类型
             u = url['url']
+            # 先判断是否是同一个域名下的
+            if not sameOrigin(u, domain):
+                continue
+
             pattern = UrlPattern(u).get_pattern()
             pattern_md5 = hashmd5(pattern)
             if 'request' in url:
                 result = json.dumps(url)
                 method = url['method']
-                count += 1
-                result_queue.put(result)
                 # 插入结果，后续可以直接插入到Mongo里
                 redis_util.insert_result(result)
                 redis_util.set_url_scanned(method, pattern_md5)
             else:
-
                 if redis_util.is_url_scanned(method, pattern_md5):
                     pass
                 else:
@@ -130,17 +140,13 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
         task = redis_util.fetch_one_task()
         # task = unscan_queue.get()
         url = json.loads(task)
+        # 同源
+        u = url['url']
+        if not sameOrigin(u, domain):
+            continue
 
-        '''判断是否扫过了已经'''
-        #u = url['url']
-        #pattern = UrlPattern(u).get_pattern()
-        #pattern_md5 = hashmd5(pattern)
-        #method = url['method']
-        # 如果扫过了
-        # if pattern + "|" + pattern_md5 in scanned_set:
-        #     continue
 
-        a = HeadlessCrawler(wsaddr, url['url'], cookie=cookie, depth=url['depth']+1)
+        a = HeadlessCrawler(wsaddr, u, cookie=cookie, depth=url['depth']+1)
         await a.spider()
         for url in a.collect_url:
             # 还可以判断一下url的类型
@@ -150,31 +156,17 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
                 continue
 
             u = url['url']
-            # if u.startswith('javascript') or u.startswith('about') or '@' in u:
-            #     continue
-            # 判断URL是否被block了
-            try:
-                tu = TURL(u)
-                if tu.is_block_host() or tu.is_block_path() or tu.is_ext_static():
-                    continue
-            except:
+
+            if not sameOrigin(u, domain):
                 continue
 
 
             pattern = UrlPattern(u).get_pattern()
             pattern_md5 = hashmd5(pattern)
             method = url['method']
-            # 如果扫过了
-            # if redis_util.is_url_scanned(method, pattern_md5):
-            #     continue
-            # if pattern + "|" + pattern_md5 in scanned_set:
-            #     continue
 
             if 'request' in url:
-                count += 1
                 result = json.dumps(url)
-                result_queue.put(result)
-
                 # # 插入结果，后续可以直接插入到Mongo里
                 redis_util.insert_result(result)
                 redis_util.set_url_scanned(method, pattern_md5)
@@ -296,7 +288,7 @@ async def main():
     url = 'http://www.iqiyi.com/'
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
-    await spider(wsaddr, url, 'iqiyi', goon=True)
+    await spider(wsaddr, url, 'iqiyi', goon=False)
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())

@@ -23,6 +23,7 @@ class RedisConf(object):
         self.task_scanned = taskname + ':scanned'
         self.task_unscan = taskname + ':unscan'
         self.task_pattern = taskname + ':pattern'
+        self.task_domain = taskname + ':domain' # 用来比较域名
 
 
 
@@ -39,6 +40,7 @@ class RedisUtils(object):
         self.l_url_result = conf.task_result
         self.h_url_scanned = conf.task_scanned
         self.h_url_pattern = conf.task_pattern
+        self.l_task_domain = conf.task_domain
         self.redis_client = None
         self.connect(conf)
 
@@ -118,6 +120,16 @@ class RedisUtils(object):
         """
         key = '{}/{}'.format(method, pattern)
         return self.redis_client.hexists(self.h_url_scanned, key)
+
+    def set_task_domain(self, netloc):
+        return self.redis_client.lpush(self.l_task_domain, netloc)
+
+
+    def fetch_task_domain(self):
+        domain = self.redis_client.lpop(self.l_task_domain)
+        self.redis_client.lpush(self.l_task_domain, domain)
+        return domain
+
 
 
 

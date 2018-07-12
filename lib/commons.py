@@ -251,3 +251,8 @@ def hashmd5(string):
         string = string
     return md5(string).hexdigest()
 
+
+
+if __name__ == '__main__':
+    s = TURL('http://static.iqiyi.com/js/pingback/iwt.js?_=21312312')
+    assert s.is_ext_static() == True
