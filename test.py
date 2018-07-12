@@ -4,6 +4,7 @@ import re
 import json
 import threading
 from queue import Queue
+from threading import Thread
 from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
 from lib.headlesscrower import HeadlessCrawler
