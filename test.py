@@ -71,14 +71,14 @@ async def worker(conf, wsaddr, cookie=None):
 
 def sameOrigin(url, domain):
     try:
-        turl = TURL(u)
-        assert turl.netloc == domain
-        assert turl.is_block_host() == False, 'is block host'
-        assert turl.is_block_path() == False, 'is block path'
-        assert turl.is_ext_static() == False, 'is static extention'
+        turl = TURL(url)
+        assert turl.netloc == domain, '{} is not belongs {}'.format(url, domain)
+        assert turl.is_block_host() == False, '{} is block host'.format(url)
+        assert turl.is_block_path() == False, '{} is block path'.format(url)
+        assert turl.is_ext_static() == False, '{} is static extention'.format(url)
         return True
     except Exception as e:
-        print(repr(e))
+        print(e)
         return False
 
 
@@ -181,15 +181,6 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
                 # scanned_set.add( pattern + "|" + pattern_md5)
 
     print("-----------done------")
-    result = []
-    print('totle count: {}'.format(count))
-    while not result_queue.empty():
-        s = (result_queue.get())
-        result.append(s)
-
-    with open('fetched_url.json', 'w') as f:
-        json.dump((result), f)
-
 
 
 

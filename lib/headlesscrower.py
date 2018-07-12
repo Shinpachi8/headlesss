@@ -151,7 +151,8 @@ async def mutationobserver(page):
 
 
 async def hook_response(resp):
-    print("resp.url = {}".format(resp.url))
+    #print("resp.url = {}".format(resp.url))
+    pass
 
 
 async def dismiss_dialog(dialog):
@@ -316,7 +317,7 @@ class HeadlessCrawler(object):
                       'AAAAEBAwAAACXbVsoAAAAGUExURczMzP///9ONFXYAAAAJcEhZcwAADsQAAA7EAZUrDhsAAAAKSURBVAiZY'
                       '2AAAAACAAH0cWSmAAAAAElFTkSuQmCC')
         if request.resourceType == 'image':
-            print("request.recourceType=image, url={}".format(request.url))
+            #print("request.recourceType=image, url={}".format(request.url))
             await request.respond({
                 'status': 200,
                 'contentType': 'image/png',
@@ -326,10 +327,10 @@ class HeadlessCrawler(object):
             await request.abort()
         else:
             if request.url in self.crawled_url:
-                print("request.crawled_url={}".format(request.url))
+                #print("request.crawled_url={}".format(request.url))
                 await request.abort()
             else:
-                print('hooked Url: {}'.format(request.url))
+                #print('hooked Url: {}'.format(request.url))
                 if not self.headers:
                     self.headers = request.headers
                 item = {'depth': self.depth, 'url': request.url, 'method': request.method, 'data': request.postData, 'headers': request.headers, 'request':True}
