@@ -35,7 +35,7 @@ def workthread(conf, wsaddr, cookie=None, domain=''):
 
 
 async def worker(conf, wsaddr, cookie=None, domain=''):
-    redis_util - RedisUtils(conf)
+    redis_util = RedisUtils(conf)
     while True:
         # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
         # 或者redis的任务为0了,就可以退出了
@@ -48,19 +48,19 @@ async def worker(conf, wsaddr, cookie=None, domain=''):
         url = json.loads(task)
         # 同源
         u = url['url']
-        print("=========================fetched Form Redis: \n{}==================".format(u))
+        print("=========================\nfetched Form Redis: \n{}\n==================".format(u))
         # if not sameOrigin(u, domain):
         #     continue
+        depth = url['depth']
+        if depth > 3: # 超过四层就退出
+            print("---------------depth > 3-------------")
+            continue
 
 
         a = HeadlessCrawler(wsaddr, u, cookie=cookie, depth=url['depth']+1)
         await a.spider()
         for url in a.collect_url:
             u = url['url']
-            depth = url['depth']
-            if depth > 3: # 超过四层就退出
-                print("---------------depth > 3-------------")
-                continue
 
             if not sameOrigin(u, domain):
                 continue
@@ -139,14 +139,14 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
                     redis_util.insert_one_task(task)
                     redis_util.set_url_scanned(method, pattern_md5)
 
-    '''
-    in_loop = asyncio.get_event_loop()
-    in_loop.run_until_complete(asyncio.gather(*[worker(conf, wsaddr, cookie) for t in range(10)]))
-    in_loop.close()
+    tasks = [asyncio.ensure_future(worker(conf, wsaddr, cookie, domain)) for i in range(10)]
+    print(tasks)
+    await asyncio.wait(tasks)
+
     '''
     threads = []
-    for i in range(5):
-        t = Thread(workthread, args=(conf, wsaddr, cookie, domain))
+    for i in range(2):
+        t = Thread(target=workthread, args=(conf, wsaddr, cookie, domain))
         threads.append(t)
 
     for t in threads:
@@ -155,6 +155,7 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     for t in threads:
         t.join()
 
+    '''
     # for i in range(20):
     #     # 20协程来跑
     #     await worker(redis_util, wsaddr, cookie, domain=domain)
@@ -304,11 +305,13 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/d7707dac-b9c1-4397-bdbd-9ae147f4cfc8'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/110e4a67-774a-4596-9a7b-9d8bbed9597a'
     url = 'http://www.iqiyi.com/'
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
+    start = time.time()
     await spider(wsaddr, url, 'iqiyi', goon=False)
+    print(time.time() - start)
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())
