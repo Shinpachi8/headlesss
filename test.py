@@ -61,7 +61,7 @@ async def worker(conf, wsaddr, cookie=None, domain=''):
             if depth > 3: # 超过四层就退出
                 print("---------------depth > 3-------------")
                 continue
-            
+
             if not sameOrigin(u, domain):
                 continue
             pattern = UrlPattern(u).get_pattern()
@@ -146,12 +146,12 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     '''
     threads = []
     for i in range(5):
-        t = Thread(workthread, args=(conf, wsaddr, cookie, domian))
+        t = Thread(workthread, args=(conf, wsaddr, cookie, domain))
         threads.append(t)
-    
+
     for t in threads:
         t.start()
-    
+
     for t in threads:
         t.join()
 
