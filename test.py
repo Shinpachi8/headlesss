@@ -9,10 +9,16 @@ from lib.RedisUtil import RedisConf,RedisUtils
 from lib.headlesscrower import HeadlessCrawler
 from lib.commons import TURL, hashmd5
 from lib.UrlDeDuplicate import UrlPattern
+from multi_process import AdvancedConcurrencyManager
 #from pyppeteer.network_manager import Request
 
 
-async def worker(redis_util, wsaddr, cookie=None, domain=''):
+
+
+
+
+async def worker(conf, wsaddr, cookie=None, domain=''):
+    redis_util - RedisUtils(conf)
     while True:
         # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
         # 或者redis的任务为0了,就可以退出了
@@ -25,21 +31,20 @@ async def worker(redis_util, wsaddr, cookie=None, domain=''):
         url = json.loads(task)
         # 同源
         u = url['url']
-        print("=========================fetched Form Redis\n: {}==================".format(u))
-        if not sameOrigin(u, domain):
-            continue
-        
-        depth = url['depth']
-        if depth > 3: # 超过四层就退出
-            print("---------------depth > 3-------------")
-            continue
+        print("=========================fetched Form Redis: \n{}==================".format(u))
+        # if not sameOrigin(u, domain):
+        #     continue
 
 
         a = HeadlessCrawler(wsaddr, u, cookie=cookie, depth=url['depth']+1)
         await a.spider()
         for url in a.collect_url:
             u = url['url']
-
+            depth = url['depth']
+            if depth > 3: # 超过四层就退出
+                print("---------------depth > 3-------------")
+                continue
+            
             if not sameOrigin(u, domain):
                 continue
             pattern = UrlPattern(u).get_pattern()
@@ -53,7 +58,7 @@ async def worker(redis_util, wsaddr, cookie=None, domain=''):
                 redis_util.set_url_scanned(method, pattern_md5)
             else:
                 if redis_util.is_url_scanned(method, pattern_md5):
-                    print("[Pattern Found] [{}]".format(pattern))
+                    # print("[Pattern Found] [{}]".format(pattern))
                     pass
                 else:
                     task = json.dumps(url)
@@ -122,9 +127,19 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     in_loop.run_until_complete(asyncio.gather(*[worker(conf, wsaddr, cookie) for t in range(10)]))
     in_loop.close()
     '''
-    for i in range(20):
-        # 20协程来跑
-        await worker(redis_util, wsaddr, cookie, domain=domain)
+    tasks = (
+        (worker, conf, wsaddr, cookie=cookie, domain=domain)
+        (worker, conf, wsaddr, cookie=cookie, domain=domain)
+        (worker, conf, wsaddr, cookie=cookie, domain=domain)
+        (worker, conf, wsaddr, cookie=cookie, domain=domain)
+        (worker, conf, wsaddr, cookie=cookie, domain=domain)
+    )
+    c = AdvancedConcurrencyManager(tasks, n_process=2, n_threads=5, n_tasks=10)
+	c.run()
+
+    # for i in range(20):
+    #     # 20协程来跑
+    #     await worker(redis_util, wsaddr, cookie, domain=domain)
 
     # while True:
     #     # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了

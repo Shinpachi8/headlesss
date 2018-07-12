@@ -345,6 +345,7 @@ class HeadlessCrawler(object):
         对URL进行标准化
         '''
         final_url = ''
+        url = url.strip()
         if url.startswith('http://') or url.startswith('https://'): # http://www.iqiyi.com
             final_url = url
         elif url.startswith('//'):  # //www.iqiyi.com
