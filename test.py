@@ -75,7 +75,7 @@ async def worker(conf, wsaddr, cookie=None):
 
 
 
-async def spider(wsaddr, url, taskname, cookie=None):
+async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     # 2018-07-09 先写单线程，再写成生产者和消费者
     conf = RedisConf(taskname, db=1)
     redis_util = RedisUtils(conf)
@@ -85,30 +85,32 @@ async def spider(wsaddr, url, taskname, cookie=None):
 
     count = 0
 
-    a = HeadlessCrawler(wsaddr, url, cookie=cookie)
-    await a.spider()
-    # print(a.collect_url)
-    for url in a.collect_url:
-        # 还可以判断一下url的类型
-        u = url['url']
-        pattern = UrlPattern(u).get_pattern()
-        pattern_md5 = hashmd5(pattern)
-        if 'request' in url:
-            result = json.dumps(url)
-            method = url['method']
-            count += 1
-            result_queue.put(result)
-            # 插入结果，后续可以直接插入到Mongo里
-            redis_util.insert_result(result)
-            redis_util.set_url_scanned(method, pattern_md5)
-        else:
-
-            if redis_util.is_url_scanned(method, pattern_md5):
-                pass
-            else:
-                task = json.dumps(url)
-                redis_util.insert_one_task(task)
+    if not goon:
+        print("start from new url.....")
+        a = HeadlessCrawler(wsaddr, url, cookie=cookie)
+        await a.spider()
+        # print(a.collect_url)
+        for url in a.collect_url:
+            # 还可以判断一下url的类型
+            u = url['url']
+            pattern = UrlPattern(u).get_pattern()
+            pattern_md5 = hashmd5(pattern)
+            if 'request' in url:
+                result = json.dumps(url)
+                method = url['method']
+                count += 1
+                result_queue.put(result)
+                # 插入结果，后续可以直接插入到Mongo里
+                redis_util.insert_result(result)
                 redis_util.set_url_scanned(method, pattern_md5)
+            else:
+
+                if redis_util.is_url_scanned(method, pattern_md5):
+                    pass
+                else:
+                    task = json.dumps(url)
+                    redis_util.insert_one_task(task)
+                    redis_util.set_url_scanned(method, pattern_md5)
 
     '''
     in_loop = asyncio.get_event_loop()
@@ -290,11 +292,11 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/fac57600-3af2-4526-9794-b1db97b28de5'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/df8fc9c1-551d-40c2-9c1c-ba12b57b785d'
     url = 'http://www.iqiyi.com/'
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
-    await spider(wsaddr, url, 'iqiyi')
+    await spider(wsaddr, url, 'iqiyi', goon=True)
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())

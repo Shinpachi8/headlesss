@@ -544,14 +544,14 @@ class HeadlessCrawler(object):
             if window_link:
                 window_link = list(set(window_link))
                 for link in window_link:
-                    if link is None or linke.strip() == '#':
+                    if link is None or link.strip() == '#':
                         continue
                     # print("---------link--------------")
                     # print(link)
                     if link.startswith("javascript:"):
                         try:
                             await self.page.waitForFunction(link, {"timeout": 5000})
-                        except:
+                        except Exception as e:
                             print("exec {} failed".format(repr(e)))
 
                         continue
