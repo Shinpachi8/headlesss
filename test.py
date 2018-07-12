@@ -12,61 +12,55 @@ from lib.UrlDeDuplicate import UrlPattern
 #from pyppeteer.network_manager import Request
 
 
-async def worker(conf, wsaddr, cookie=None):
-    redis_util = RedisUtils(conf)
+async def worker(redis_util, wsaddr, cookie=None, domain=''):
     while True:
         # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
         # 或者redis的任务为0了,就可以退出了
         if redis_util.task_counts == 0:
             break
-
+        # if unscan_queue.empty():
+        #     break
         task = redis_util.fetch_one_task()
+        # task = unscan_queue.get()
         url = json.loads(task)
-
-        '''判断是否扫过了已经'''
+        # 同源
         u = url['url']
-        pattern = UrlPattern(u).get_pattern()
-        pattern_md5 = hashmd5(pattern)
-        method = url['method']
-        # 如果扫过了
-        if redis_util.is_url_scanned(method, pattern_md5):
+        print("fetched Form Redis: {}".format(u))
+        if not sameOrigin(u, domain):
+            continue
+        
+        depth = url['depth']
+        if depth > 3: # 超过四层就退出
+            print("---------------depth > 3-------------")
             continue
 
-        a = HeadlessCrawler(wsaddr, url['url'], cookie=cookie)
+
+        a = HeadlessCrawler(wsaddr, u, cookie=cookie, depth=url['depth']+1)
         await a.spider()
         for url in a.collect_url:
-            # 还可以判断一下url的类型
-            depth = url['depth']
-            if depth > 4: # 超过四层就退出
-                continue
-
             u = url['url']
-            if u.startswith('javascript') or u.startswith('about') or '@' in u:
-                continue
-            # 判断URL是否被block了
-            try:
-                tu = TURL(u)
-            except:
-                continue
-            if tu.is_block_host() or tu.is_block_path() or tu.is_ext_static():
-                continue
 
+            if not sameOrigin(u, domain):
+                continue
             pattern = UrlPattern(u).get_pattern()
             pattern_md5 = hashmd5(pattern)
             method = url['method']
-            # 如果扫过了
-            if redis_util.is_url_scanned(method, pattern_md5):
-                continue
 
             if 'request' in url:
                 result = json.dumps(url)
-                # 插入结果，后续可以直接插入到Mongo里
+                # # 插入结果，后续可以直接插入到Mongo里
                 redis_util.insert_result(result)
-                #redis_util.set_url_scanned(method, pattern_md5)
-            else:
-                task = json.dumps(url)
-                redis_util.insert_one_task(task)
                 redis_util.set_url_scanned(method, pattern_md5)
+            else:
+                if redis_util.is_url_scanned(method, pattern_md5):
+                    pass
+                else:
+                    task = json.dumps(url)
+                    redis_util.insert_one_task(task)
+                    redis_util.set_url_scanned(method, pattern_md5)
+                # unscan_queue.put(task)
+                # scanned_set.add( pattern + "|" + pattern_md5)
+
 
 
 def sameOrigin(url, domain):
@@ -127,58 +121,59 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     in_loop.run_until_complete(asyncio.gather(*[worker(conf, wsaddr, cookie) for t in range(10)]))
     in_loop.close()
     '''
-    #for i in range(10):
-    #    await worker(conf, wsaddr, cookie)
+    for i in range(20):
+        # 20协程来跑
+        await worker(redis_util, wsaddr, cookie, domain=domain)
 
-    while True:
-        # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
-        # 或者redis的任务为0了,就可以退出了
-        if redis_util.task_counts == 0:
-            break
-        # if unscan_queue.empty():
-        #     break
-        task = redis_util.fetch_one_task()
-        # task = unscan_queue.get()
-        url = json.loads(task)
-        # 同源
-        u = url['url']
-        if not sameOrigin(u, domain):
-            continue
-
-
-        a = HeadlessCrawler(wsaddr, u, cookie=cookie, depth=url['depth']+1)
-        await a.spider()
-        for url in a.collect_url:
-            # 还可以判断一下url的类型
-            depth = url['depth']
-            if depth > 3: # 超过四层就退出
-                print("---------------depth > 3-------------")
-                continue
-
-            u = url['url']
-
-            if not sameOrigin(u, domain):
-                continue
+    # while True:
+    #     # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
+    #     # 或者redis的任务为0了,就可以退出了
+    #     if redis_util.task_counts == 0:
+    #         break
+    #     # if unscan_queue.empty():
+    #     #     break
+    #     task = redis_util.fetch_one_task()
+    #     # task = unscan_queue.get()
+    #     url = json.loads(task)
+    #     # 同源
+    #     u = url['url']
+    #     if not sameOrigin(u, domain):
+    #         continue
 
 
-            pattern = UrlPattern(u).get_pattern()
-            pattern_md5 = hashmd5(pattern)
-            method = url['method']
+    #     a = HeadlessCrawler(wsaddr, u, cookie=cookie, depth=url['depth']+1)
+    #     await a.spider()
+    #     for url in a.collect_url:
+    #         # 还可以判断一下url的类型
+    #         depth = url['depth']
+    #         if depth > 3: # 超过四层就退出
+    #             print("---------------depth > 3-------------")
+    #             continue
 
-            if 'request' in url:
-                result = json.dumps(url)
-                # # 插入结果，后续可以直接插入到Mongo里
-                redis_util.insert_result(result)
-                redis_util.set_url_scanned(method, pattern_md5)
-            else:
-                if redis_util.is_url_scanned(method, pattern_md5):
-                    pass
-                else:
-                    task = json.dumps(url)
-                    redis_util.insert_one_task(task)
-                    redis_util.set_url_scanned(method, pattern_md5)
-                # unscan_queue.put(task)
-                # scanned_set.add( pattern + "|" + pattern_md5)
+    #         u = url['url']
+
+    #         if not sameOrigin(u, domain):
+    #             continue
+
+
+    #         pattern = UrlPattern(u).get_pattern()
+    #         pattern_md5 = hashmd5(pattern)
+    #         method = url['method']
+
+    #         if 'request' in url:
+    #             result = json.dumps(url)
+    #             # # 插入结果，后续可以直接插入到Mongo里
+    #             redis_util.insert_result(result)
+    #             redis_util.set_url_scanned(method, pattern_md5)
+    #         else:
+    #             if redis_util.is_url_scanned(method, pattern_md5):
+    #                 pass
+    #             else:
+    #                 task = json.dumps(url)
+    #                 redis_util.insert_one_task(task)
+    #                 redis_util.set_url_scanned(method, pattern_md5)
+    #             # unscan_queue.put(task)
+    #             # scanned_set.add( pattern + "|" + pattern_md5)
 
     print("-----------done------")
 

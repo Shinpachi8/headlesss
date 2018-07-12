@@ -33,7 +33,7 @@ async def mutationobserver(page):
             records.forEach(function (record) {
                 //console.info('Mutation type: ', record.type);
                 if (record.type == 'attributes') {
-                    console.info("Mutation attributes:", record.target[record.attributeName]);
+                    //console.info("Mutation attributes:", record.target[record.attributeName]);
                     window.LINKS.push(record.target[record.attributeName]);
                 } else if (record.type == 'childList') {
                     for (var i = 0; i < record.addedNodes.length; ++i) {
@@ -41,7 +41,7 @@ async def mutationobserver(page):
                         var node = record.addedNodes[i];
                         if (node.src || node.href) {
                             window.LINKS.push(node.src || node.href);
-                            console.info('Mutation AddedNodes:', node.src || node.href);
+                            //console.info('Mutation AddedNodes:', node.src || node.href);
                             };
 
 
@@ -73,7 +73,7 @@ async def mutationobserver(page):
             if (window.EVENTS_HISTORY.indexOf(hash) < 0) {
                 window.EVENTS.push({"event": a, "element": this});
                 window.EVENTS_HISTORY.unshift(hash);
-                console.info('addEventListener:', a, this);
+                //console.info('addEventListener:', a, this);
             }
             this._addEventListener(a, b, c);
         };
@@ -213,9 +213,7 @@ async def get_event(page):
     return result
 
 async def hook_console(console):
-    print("console.text--------------")
-    print(console.text)
-    pass
+    print("console.text-------------- {}".format(console.text))
 
 
 
@@ -373,11 +371,11 @@ class HeadlessCrawler(object):
                 if (['text','search'].indexOf(inp['type'].toLocaleLowerCase()) > -1){
                     // username
                     if ('value' in inp && inp['value'] != ''){
-                        console.log("value not empty, continue");
+                        //console.log("value not empty, continue");
                         continue;
                     };
                     if (inp.name.indexOf('user') > -1){
-                        console.log('input username');
+                        //console.log('input username');
                         // 这里可以传入用户名
                         inp.value = 'what_ever_a';
                     }else if (inp.name.indexOf('email') > -1){
@@ -394,10 +392,10 @@ class HeadlessCrawler(object):
                 }else if (inp['type'] == 'password'){
                     inp.value = 'test password';
                 }else if (inp['type'] == 'radio'){
-                    console.log('123123123123');
+                    //console.log('123123123123');
                     inp.checked=true;
                 }else if (inp['type'] == 'checkbox'){
-                    console.log('123123123123');
+                    //console.log('123123123123');
                     inp.checked=true;
                 }
             }
@@ -407,7 +405,7 @@ class HeadlessCrawler(object):
                 var s = selects[i];
                 for(var j=0; j<s.length; j++){
                     var item = s[j];
-                    console.log(item.text);
+                    //console.log(item.text);
                     item.selected=true;
                 }
             }
