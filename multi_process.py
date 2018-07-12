@@ -128,9 +128,9 @@ class _ConcurrentManager(object):
                 for x in self.running_process:
                     x.join()
 
-                except KeyboardInterrupt:
-                        for x in self.running_process:
-                                x.terminate()
+        except KeyboardInterrupt:
+                for x in self.running_process:
+                        x.terminate()
 
     # --------------------------------------------------------------------------
     # Scalability methods
