@@ -14,7 +14,23 @@ from multi_process import AdvancedConcurrencyManager
 
 
 
+def workthread(conf, wsaddr, cookie=None, domain=''):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
+    try:
+        tasks = [worker(conf, wsaddr, cookie=cookie, domain=domain) for i in range(10)]
+        loop.run_until_complete(asyncio.gather(*tasks))
+    except KeyboardInterrupt:
+        # Canceling tasks
+        tasks = asyncio.Task.all_tasks()
+
+        map(asyncio.Task.cancel, tasks)
+
+        loop.run_forever()
+        tasks.exception()
+    finally:
+        loop.close()
 
 
 async def worker(conf, wsaddr, cookie=None, domain=''):
@@ -78,7 +94,7 @@ def sameOrigin(url, domain):
         assert turl.is_ext_static() == False, '{} is static extention'.format(url)
         return True
     except Exception as e:
-        print(e)
+        # print(e)
         return False
 
 
@@ -127,15 +143,16 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     in_loop.run_until_complete(asyncio.gather(*[worker(conf, wsaddr, cookie) for t in range(10)]))
     in_loop.close()
     '''
-    tasks = (
-        (worker, conf, wsaddr, cookie, domain),
-        (worker, conf, wsaddr, cookie, domain),
-        (worker, conf, wsaddr, cookie, domain),
-        (worker, conf, wsaddr, cookie, domain),
-        (worker, conf, wsaddr, cookie, domain),
-    )
-    c = AdvancedConcurrencyManager(tasks, n_process=2, n_threads=5, n_tasks=10)
-    c.run()
+    threads = []
+    for i in range(5):
+        t = Thread(workthread, args=(conf, wsaddr, cookie, domian))
+        threads.append(t)
+    
+    for t in threads:
+        t.start()
+    
+    for t in threads:
+        t.join()
 
     # for i in range(20):
     #     # 20协程来跑
