@@ -15,6 +15,8 @@ try:
 except:
     from urllib.parse import urlencode
 
+import re
+
 def isascii(s):
     return all([ord(i) < 128 for i in s])
 
@@ -101,6 +103,8 @@ class UrlPattern(object):
             s = '/'.join(pattern) + ext
         else:
             s = '/'.join(pattern)
+        # 单纯的数字替换完，可以替换一下 /playlist123123/里的数字
+        s = re.sub(r'\d+', '{digit}', s)
         # print(s)
         return s
 
@@ -118,7 +122,8 @@ def main():
     # url = 'http://www.iqiyi.com/v_19rr1eiivs.html'
     # url = 'http://www.iqiyi.com/v_19rr1vzhxw.html?list=19rrliqko6'
     # url = 'http://so.iqiyi.com/so/q_%E8%8A%B8%E6%B1%90%E4%BC%A0?refersource=lib'
-    url = 'http://list.iqiyi.com/www/31/-27507------------11-1--iqiyi--.html'
+    # url = 'http://list.iqiyi.com/www/31/-27507------------11-1--iqiyi--.html'
+    url = 'http://www.iqiyi.com/playlist411946202.html'
     print(UrlPattern(url).get_pattern())
 
 if __name__ == '__main__':

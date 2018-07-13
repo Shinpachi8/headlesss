@@ -142,7 +142,7 @@ async def mutationobserver(page):
             }"""
     #print(dir(page))
     await page.evaluateOnNewDocument(hook_windows)
-    await page.evaluateOnNewDocument(jsfunc_str)
+    await page.evaluate(jsfunc_str)
     await page.evaluateOnNewDocument(hook_open)
     # jsfunc_str_exec = '''monitor()'''
     # result2 = await page.evaluate(jsfunc_str_exec)
@@ -205,7 +205,7 @@ async def get_event(page):
 }
     '''
     result = await page.evaluate(js_getevent_func)
-    print("js_getevent_func = {}".format(result))
+    # print("js_getevent_func = {}".format(result))
     result = json.loads(result)
     # result = await page.evaluate('get_event()')
     # print('found something')
