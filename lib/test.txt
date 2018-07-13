@@ -1,0 +1,6 @@
+获取事件被触发后的节点属性变更更信息
+[]
+self.page.reload done
+[{'name': 'QC005', 'value': '2e297c2e4c4776d707615ef8c2f843a8', 'domain': 'mp.iqiyi.com', 'path': '/', 'expires': -1, 'size': 37, 'httpOnly': False, 'secure': False, 'session': True}]
+console.text-------------- href found: ”http://www.iqiyi.com/”
+console.text-------------- href found: /

@@ -14,7 +14,7 @@ from pyppeteer import launch
 # from pyppeteer.network_manager import Response
 from bs4 import BeautifulSoup as bs
 from pyee import EventEmitter
-
+from config import *
 
 
 async def mutationobserver(page):
@@ -142,7 +142,7 @@ async def mutationobserver(page):
             }"""
     #print(dir(page))
     await page.evaluateOnNewDocument(hook_windows)
-    await page.evaluate(jsfunc_str)
+    await page.evaluateOnNewDocument(jsfunc_str)
     await page.evaluateOnNewDocument(hook_open)
     # jsfunc_str_exec = '''monitor()'''
     # result2 = await page.evaluate(jsfunc_str_exec)
@@ -165,6 +165,7 @@ async def hook_error(error):
 async def get_event(page):
     js_getevent_func = '''get_event = ()=>{
     var event = {};
+    event['link'] = [];
     var treeWalker = document.createTreeWalker(
         document.body,
         NodeFilter.SHOW_ELEMENT,
@@ -195,8 +196,8 @@ async def get_event(page):
         if(element.nodeName.toLowerCase() == 'a'){
             // check if has href attribute
             if(element.hasAttribute("href")){
-                //console.log("href found: " + element.getAttribute('href'));
-                window.LINKS.push(element.getAttribute("href"));
+                console.log("href found: " + element.getAttribute('href'));
+                event['link'].push(element.getAttribute("href"));
             }
         }
     };
@@ -356,6 +357,7 @@ class HeadlessCrawler(object):
             # origin_path = self.parsed_url.path
             # target_path = os.path.join(origin_path, url)
             final_url = urlparse.urljoin(self.based_url, url)
+        #print("final_url: {}".format(final_url))
         return final_url
 
 
@@ -457,27 +459,43 @@ class HeadlessCrawler(object):
         try:
             await self._init_page()
             # print('init page donw----------------------')
+            await self.page.goto(self.url, {'waitUntil':'load', 'timeout':15000})
             # 判断cookie的格式
             try:
                 if self.cookie is None:
                     pass
                 elif type(self.cookie) is list: # list 格式
-                    self.page.setCookies(self.cookie)
+                    #print("cookie is list")
+                    for cookie in self.cookie:
+                        await self.page.setCookie(cookie)
                 else: # json格式
                     cookie = json.loads(self.cookies)
                     if type(cookie) == list:
-                        self.page.setCookies(cookie)
+                        await self.page.setCookie(*cookie)
                     elif type(cookie) == dict:
-                        self.page.setCookies([cookie,])
+                        await self.page.setCookie(cookie)
                     else:
                         raise Exception('cookie format error')
-            except:
+            except Exception as e:
                 print('[ERROR]  [HeadlessCrawler][spider][setCookies]  setCookies Error, please check your cookies format')
+                print(e)
                 return
 
             # 访问URL
-            await self.page.goto(self.url, {'waitUntil':'load', 'timeout':10000})
+            print(await self.page.cookies())
+            #await self.page.evaluate(
+            #        'document.cookie = "QC005=2e297c2e4c4776d707615ef8c2f843a8; QC006=z9mc893qf3lvb9lj917avu9r; T00404=d9f71cc5e254f427d8ad8deeeca112dd; QC173=0; P00004=-898887952.1530510174.aab7357f0a; QC160=%7B%22u%22%3A%2218510725391%22%2C%22lang%22%3A%22%22%2C%22local%22%3A%7B%22name%22%3A%22%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86%22%2C%22init%22%3A%22Z%22%2C%22rcode%22%3A48%2C%22acode%22%3A%2286%22%7D%2C%22type%22%3A%22p1%22%7D; QC007=DIRECT; QC008=1530510165.1530510165.1531102822.2; nu=0; QP001=1; T00700=EgcI18DtIRAB; QC001=1; QC021=%5B%7B%22key%22%3A%22playlist%22%7D%5D; QC124=1%7C0; P00001=a5WUo0Wvm1aZ5IFw2uYzUqkOZK56NuRz5LLCEYyv1LGdRvZm2m14nPFUgfGYKvK5RDCHP70; P00003=1444386669; P00010=1444386669; P01010=1531497600; P00007=a5WUo0Wvm1aZ5IFw2uYzUqkOZK56NuRz5LLCEYyv1LGdRvZm2m14nPFUgfGYKvK5RDCHP70; P00PRU=1444386669; P00002=%7B%22uid%22%3A%221444386669%22%2C%22pru%22%3A1444386669%2C%22user_name%22%3A%2218510725391%22%2C%22nickname%22%3A%22shinpachi8%22%2C%22pnickname%22%3A%22shinpachi8%22%2C%22type%22%3A11%2C%22email%22%3A%22xiaoyan_jia1%40163.com%22%7D; P000email=xiaoyan_jia1%40163.com; QP008=960; QP007=0; QC010=46360036; QC170=0; __dfp=a0a801605d3043494885594bed84b92f81f3025593d0ea319c5e6aa109cffbf99a@1531806166483@1530510166483; QC163=1"'
+            #        )
+            #await self.page.reload()
+            print("self.page.reload done")
+            cookie = await self.page.cookies()
+            print(cookie)
 
+            event = await self.page.waitForFunction(js_getevent_func, {'timeout':'5000'})
+            #print(await self.page.content())
+            #print(event.toString())
+            #await self._close()
+            return
 
             # 首先获取a 中的href值，等到所有的事件都触发了，再收集一次
             html = await self.page.content()
@@ -498,7 +516,14 @@ class HeadlessCrawler(object):
             # 获取事件:
             events = await get_event(self.page)
             for key in events:
-                self.event.extend(events[key])
+                if key == 'link':
+                    for url in events[key]:
+                        print("event:links:  {}".format(url))
+                        url = self.validUrl(url)
+                        item = {'method': 'GET', 'data':None, 'headers':self.headers, 'url': url, 'depth': self.depth}
+                        self.add_to_collect(item)
+                else:
+                    self.event.extend(events[key])
 
 
 
@@ -511,7 +536,14 @@ class HeadlessCrawler(object):
             # 获取事件:
             events = await get_event(self.page)
             for key in events:
-                self.event.extend(events[key])
+                if key == 'link':
+                    for url in events[key]:
+                        url = self.validUrl(url)
+                        if self.sameOrign(url):
+                            item = {'method': 'GET', 'data':None, 'headers':self.headers, 'url': url, 'depth': self.depth}
+                            self.add_to_collect(item)
+                else:
+                    self.event.extend(events[key])
 
             self.event = list(set(self.event))
             # 点击button
@@ -529,6 +561,7 @@ class HeadlessCrawler(object):
             #  执行事件
             for e in self.event:
                 # print(repr(e))
+                e = e.strip()
                 try:
                     await self.page.waitForFunction(e, {"timeout": 5000})
                 except:
@@ -540,9 +573,10 @@ class HeadlessCrawler(object):
             # print("----------------------------------------------")
 
             # 获取dom变更的link
-            window_link = await self.page.evaluate('''()=>{return window.LINKS;}''')
+            window_link = await self.page.evaluate('window.LINKS', force_expr=True)
             if window_link:
                 window_link = list(set(window_link))
+                print(window_link)
                 for link in window_link:
                     if link is None or link.strip() == '#':
                         continue
@@ -563,7 +597,7 @@ class HeadlessCrawler(object):
                         self.add_to_collect(item)
 
             # 获取window.location的 link
-            window_locations = await self.page.evaluate('''()=>{return window.Redirects;}''')
+            window_locations = await self.page.evaluate('''window.Redirects''')
             if window_locations:
                 window_locations = list(set(window_locations))
                 for link in window_locations:
@@ -589,7 +623,9 @@ class HeadlessCrawler(object):
             # print("---------------- dom, windows.location done-------------------")
             # print(self.collect_url)
             # print("----------------------------------------------")
-            await self._close()
+#            await self._close()
+            window_link = await self.page.evaluate('window.LINKS', force_expr=True)
+            print(window_link)
 
         except Exception as e:
             print('[test] [Error] {}'.format(repr(e)))
@@ -599,15 +635,30 @@ class HeadlessCrawler(object):
 
 
 
-# async def main():
-#     wsaddr = 'ws://10.127.21.237:9223/devtools/browser/3e4028b0-6e0a-4f97-86ec-b1f0ed0fd612'
-#     a = HeadlessCrawler(wsaddr, 'http://www.iqiyi.com/')
-#     await a.spider()
-#     test = a.collect_url
-#     test = [json.dumps(item) for item in test]
-#     with open('result.json', 'w') as f:
-#         json.dump(list(set(test)), f)
-#     # with open('fetched_url.json', 'w') as f:
-#     #     json.dump((a.fetched_url), f)
+async def main():
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/9b3a7be3-7326-442e-97bf-bbc1e73c70a4'
+    iqiyi_cookie = None
+    with open('iqiyi_cookie.json', 'r') as f:
+        iqiyi_cookie = json.load(f)
 
-# asyncio.get_event_loop().run_until_complete(main())
+    cookie = []
+    for i in iqiyi_cookie:
+        item = {}
+        item['name'] = i['name']
+        item['value'] = i['value']
+        item['expires'] =  60 * 60 * 60
+        item['domain'] = i['domain']
+        print(item)
+        cookie.append(i)
+
+    a = HeadlessCrawler(wsaddr, 'https://mp.iqiyi.com/', cookie=cookie)
+    #a = HeadlessCrawler(wsaddr, 'https://mp.iqiyi.com/')
+    await a.spider()
+    test = a.collect_url
+    test = [json.dumps(item) for item in test]
+    with open('result.json', 'w') as f:
+        json.dump(list(set(test)), f)
+    # with open('fetched_url.json', 'w') as f:
+     #     json.dump((a.fetched_url), f)
+
+asyncio.get_event_loop().run_until_complete(main())
