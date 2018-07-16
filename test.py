@@ -140,7 +140,7 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
                     redis_util.set_url_scanned(method, pattern_md5)
 
     tasks = [asyncio.ensure_future(worker(conf, wsaddr, cookie, domain)) for i in range(10)]
-    print(tasks)
+    # print(tasks)
     await asyncio.wait(tasks)
 
     '''
@@ -240,7 +240,7 @@ async def test(wsaddr, url):
         await unrequest_set.put(url)
 
     depth = 0
-    print("[now] [lenth of unrequest_set] =======  {}".format(unrequest_set.qsize()))
+    # print("[now] [lenth of unrequest_set] =======  {}".format(unrequest_set.qsize()))
     while not unrequest_set.empty():
         # print("[now] [lenth of unrequest_set] =======  {}".format(unrequest_set.qsize()))
         url = await unrequest_set.get()
@@ -260,10 +260,10 @@ async def test(wsaddr, url):
 
         a = HeadlessCrawler(wsaddr, url, depth=depth)
         await a.spider()
-        print("===========================================\n")
-        print("url: {}".format(url))
-        print("len_of_a.collect_url:  {}".format(len(a.collect_url)))
-        print("===========================================\n")
+        # print("===========================================\n")
+        # print("url: {}".format(url))
+        # print("len_of_a.collect_url:  {}".format(len(a.collect_url)))
+        # print("===========================================\n")
         for url in a.collect_url:
             u = url['url']
             if u.startswith('javascript') or u.startswith("about"):

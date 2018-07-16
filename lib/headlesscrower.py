@@ -332,7 +332,7 @@ class HeadlessCrawler(object):
                 #print("request.crawled_url={}".format(request.url))
                 await request.abort()
             else:
-                print('hooked Url: {}'.format(request.url))
+                # print('hooked Url: {}'.format(request.url))
                 if not self.headers:
                     self.headers = request.headers
                 #request.headers['Cookie'] = self.cookie
@@ -527,7 +527,7 @@ class HeadlessCrawler(object):
             for key in events:
                 if key == 'link':
                     for url in events[key]:
-                        print("event:links:  {}".format(url))
+                        # print("event:links:  {}".format(url))
                         url = self.validUrl(url)
                         item = {'method': 'GET', 'data':None, 'headers':self.headers, 'url': url, 'depth': self.depth}
                         self.add_to_collect(item)
