@@ -48,9 +48,7 @@ async def worker(conf, wsaddr, cookie=None, domain=''):
         url = json.loads(task)
         # 同源
         u = url['url']
-        print("=========================\nfetched Form Redis: \n{}\n==================".format(u))
-        # if not sameOrigin(u, domain):
-        #     continue
+        print("=========================fetched Form Redis: {}==================".format(redis_util.result_counts()))
         depth = url['depth']
         if depth > 3: # 超过四层就退出
             print("---------------depth > 3-------------")
@@ -89,7 +87,7 @@ async def worker(conf, wsaddr, cookie=None, domain=''):
 def sameOrigin(url, domain):
     try:
         turl = TURL(url)
-        assert turl.netloc == domain, '{} is not belongs {}'.format(url, domain)
+        assert turl.netloc.find(domain) == -1, '{} is not belongs {}'.format(url, domain)
         assert turl.is_block_host() == False, '{} is block host'.format(url)
         assert turl.is_block_path() == False, '{} is block path'.format(url)
         assert turl.is_ext_static() == False, '{} is static extention'.format(url)
@@ -106,7 +104,7 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     unscan_queue = Queue()
     result_queue = Queue()
     scanned_set = set()
-    domain = TURL(url).netloc
+    domain = get_basedomain(url)
     # count = 0
     # 设置domain
     redis_util.set_task_domain(domain)
