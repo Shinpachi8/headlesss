@@ -586,7 +586,7 @@ class HeadlessCrawler(object):
             window_link = await self.page.evaluate('window.LINKS', force_expr=True)
             if window_link:
                 window_link = list(set(window_link))
-                print(window_link)
+                #print(window_link)
                 for link in window_link:
                     if link is None or link.strip() == '#':
                         continue

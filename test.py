@@ -8,7 +8,7 @@ from threading import Thread
 from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
 from lib.headlesscrower import HeadlessCrawler
-from lib.commons import TURL, hashmd5
+from lib.commons import TURL, hashmd5, get_basedomain
 from lib.UrlDeDuplicate import UrlPattern
 from multi_process import AdvancedConcurrencyManager
 #from pyppeteer.network_manager import Request
@@ -37,7 +37,6 @@ def workthread(conf, wsaddr, cookie=None, domain=''):
 async def worker(conf, wsaddr, cookie=None, domain=''):
     redis_util = RedisUtils(conf)
     print("wsaddr={}\ndomain={}".format(wsaddr, domain))
-    return
     while True:
         # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
         # 或者redis的任务为0了,就可以退出了
@@ -89,13 +88,13 @@ async def worker(conf, wsaddr, cookie=None, domain=''):
 def sameOrigin(url, domain):
     try:
         turl = TURL(url)
-        assert turl.netloc.find(domain) == -1, '{} is not belongs {}'.format(url, domain)
+        #print("turl.netloc ={}  domain={}".format(turl.netloc, domain))
+        assert turl.netloc.find(domain) >= 0, '{} is not belongs {}'.format(url, domain)
         assert turl.is_block_host() == False, '{} is block host'.format(url)
         assert turl.is_block_path() == False, '{} is block path'.format(url)
         assert turl.is_ext_static() == False, '{} is static extention'.format(url)
         return True
     except Exception as e:
-        # print(e)
         return False
 
 
@@ -308,7 +307,7 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/030eae41-55f0-4000-9bb9-8f29c539cc5e'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/04bce773-07cc-46f1-be66-3f95a6b5b753'
     url = 'http://www.iqiyi.com/'
     iqiyi_cookie = None
     with open('iqiyi_cookie.json', 'r') as f:
