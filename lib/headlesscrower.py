@@ -162,7 +162,8 @@ async def dismiss_dialog(dialog):
     await dialog.accept()
 
 async def hook_error(error):
-    print("error found:  {}".format(error))
+    # print("error found:  {}".format(error))
+    pass
 
 async def get_event(page):
     js_getevent_func = '''get_event = ()=>{
