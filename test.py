@@ -106,7 +106,6 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     scanned_set = set()
     domain = get_basedomain(url)
     print(domain)
-    return
     # count = 0
     # 设置domain
     redis_util.set_task_domain(domain)
@@ -133,7 +132,7 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
                 redis_util.insert_result(result)
                 redis_util.set_url_scanned(method, pattern_md5)
             else:
-                
+
                 if redis_util.is_url_scanned(method, pattern_md5):
                     pass
                 else:
@@ -307,7 +306,7 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/25af7ad7-f04f-4cdc-82d3-3f987ee109e6'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/030eae41-55f0-4000-9bb9-8f29c539cc5e'
     url = 'http://www.iqiyi.com/'
     iqiyi_cookie = None
     with open('iqiyi_cookie.json', 'r') as f:
