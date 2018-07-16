@@ -305,12 +305,19 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/110e4a67-774a-4596-9a7b-9d8bbed9597a'
-    url = 'http://www.iqiyi.com/'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/dcfee621-fa95-4e21-b54e-3e9377c29953'
+    url = 'https://mp.iqiyi.com/'
+    iqiyi_cookie = None
+    with open('iqiyi_cookie.json', 'r') as f:
+        iqiyi_cookie = json.load(f)
+
+    #print(iqiyi_cookie)
+    print(type(iqiyi_cookie))
+
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
     start = time.time()
-    await spider(wsaddr, url, 'iqiyi', goon=False)
+    await spider(wsaddr, url, 'mp',cookie=iqiyi_cookie, goon=False)
     print(time.time() - start)
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@ import string
 import urllib
 import logging
 import requests.packages.urllib3
+from tldextract import extract, TLDExtract
 import time
 from hashlib import md5
 try:
@@ -252,7 +253,20 @@ def hashmd5(string):
     return md5(string).hexdigest()
 
 
+def get_basedomain(url, basedomain=2):
+    try:
+        if basedomain == 1:
+            return urlparse.urlparse(url).netloc
+        elif basedomain == 2:
+            return extract(url).registered_domain
+        elif basedomain == 3:
+            return extract(url).domain # 更加有关联性的处理方法
+    except Exception as e:
+        pass
+
+
 
 if __name__ == '__main__':
     s = TURL('http://static.iqiyi.com/js/pingback/iwt.js?_=21312312')
+    print(get_basedomain(str(s)))
     assert s.is_ext_static() == True
