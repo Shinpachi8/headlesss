@@ -500,7 +500,7 @@ class HeadlessCrawler(object):
             # cookie = await self.page.cookies()
             # print(cookie)
 
-            event = await self.page.waitForFunction(js_getevent_func, {'timeout':'5000'})
+            # event = await self.page.waitForFunction(js_getevent_func, {'timeout':'5000'})
             #print(await self.page.content())
             #print(event.toString())
             #await self._close()
@@ -671,4 +671,4 @@ async def main():
     # with open('fetched_url.json', 'w') as f:
      #     json.dump((a.fetched_url), f)
 
-asyncio.get_event_loop().run_until_complete(main())
+# asyncio.get_event_loop().run_until_complete(main())

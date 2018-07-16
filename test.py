@@ -303,8 +303,8 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/dcfee621-fa95-4e21-b54e-3e9377c29953'
-    url = 'https://mp.iqiyi.com/'
+    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/25af7ad7-f04f-4cdc-82d3-3f987ee109e6'
+    url = 'http://www.iqiyi.com/'
     iqiyi_cookie = None
     with open('iqiyi_cookie.json', 'r') as f:
         iqiyi_cookie = json.load(f)
