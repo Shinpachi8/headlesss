@@ -105,6 +105,8 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
     result_queue = Queue()
     scanned_set = set()
     domain = get_basedomain(url)
+    print(domain)
+    return
     # count = 0
     # 设置domain
     redis_util.set_task_domain(domain)

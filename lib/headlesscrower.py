@@ -634,8 +634,9 @@ class HeadlessCrawler(object):
             # print(self.collect_url)
             # print("----------------------------------------------")
 #            await self._close()
-            window_link = await self.page.evaluate('window.LINKS', force_expr=True)
-            print(window_link)
+            # window_link = await self.page.evaluate('window.LINKS', force_expr=True)
+            # print(window_link)
+            await self._close()
 
         except Exception as e:
             print('[test] [Error] {}'.format(repr(e)))
