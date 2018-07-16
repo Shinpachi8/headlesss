@@ -8,7 +8,7 @@ from threading import Thread
 from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
 from lib.headlesscrower import HeadlessCrawler
-from lib.commons import TURL, hashmd5, get_basedomain
+from lib.commons import TURL, hashmd5
 from lib.UrlDeDuplicate import UrlPattern
 from multi_process import AdvancedConcurrencyManager
 #from pyppeteer.network_manager import Request
@@ -36,6 +36,8 @@ def workthread(conf, wsaddr, cookie=None, domain=''):
 
 async def worker(conf, wsaddr, cookie=None, domain=''):
     redis_util = RedisUtils(conf)
+    print("wsaddr={}\ndomain={}".format(wsaddr, domain))
+    return
     while True:
         # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
         # 或者redis的任务为0了,就可以退出了
@@ -318,7 +320,7 @@ async def main():
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
     start = time.time()
-    await spider(wsaddr, url, 'mp',cookie=iqiyi_cookie, goon=False)
+    await spider(wsaddr, url, 'mp',cookie=iqiyi_cookie, goon=True)
     print(time.time() - start)
 
 if __name__ == '__main__':
