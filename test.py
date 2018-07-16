@@ -121,15 +121,17 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
             if not sameOrigin(u, domain):
                 continue
 
+            method = url['method']
             pattern = UrlPattern(u).get_pattern()
             pattern_md5 = hashmd5(pattern)
             if 'request' in url:
                 result = json.dumps(url)
-                method = url['method']
+                # method = url['method']
                 # 插入结果，后续可以直接插入到Mongo里
                 redis_util.insert_result(result)
                 redis_util.set_url_scanned(method, pattern_md5)
             else:
+                
                 if redis_util.is_url_scanned(method, pattern_md5):
                     pass
                 else:
