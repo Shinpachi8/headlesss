@@ -8,7 +8,7 @@ from threading import Thread
 from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
 from lib.headlesscrower import HeadlessCrawler
-from lib.commons import TURL, hashmd5
+from lib.commons import TURL, hashmd5, get_basedomain
 from lib.UrlDeDuplicate import UrlPattern
 from multi_process import AdvancedConcurrencyManager
 #from pyppeteer.network_manager import Request
