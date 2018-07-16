@@ -48,7 +48,7 @@ async def worker(conf, wsaddr, cookie=None, domain=''):
         url = json.loads(task)
         # 同源
         u = url['url']
-        print("=========================fetched Form Redis: {}==================".format(redis_util.result_counts()))
+        print("=========================fetched Form Redis: {}==================".format(redis_util.result_counts))
         depth = url['depth']
         if depth > 3: # 超过四层就退出
             print("---------------depth > 3-------------")
