@@ -14,7 +14,7 @@ from pyppeteer import launch
 # from pyppeteer.network_manager import Response
 from bs4 import BeautifulSoup as bs
 from pyee import EventEmitter
-from config import *
+# from config import *
 
 
 async def mutationobserver(page):
