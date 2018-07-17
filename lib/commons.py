@@ -24,7 +24,7 @@ except:
 import random
 import requests
 from requests import  ConnectTimeout
-
+import argparse 
 
 STATIC_EXT = ["f4v","bmp","bz2","css","doc","eot","flv","gif"]
 STATIC_EXT += ["gz","ico","jpeg","jpg","js","less","mp3", "mp4"]
@@ -186,9 +186,14 @@ class TURL(object):
     def __repr__(self):
         return '<TURL for %s>' % self.final_url
 
-def LogUtil(path='/tmp/test.log', name='test'):
+def LogUtil(path='/tmp/test.log', name='test', level='1'):
+    levels = {
+        '1': logging.INFO,
+        '2': logging.WARNING,
+        '3': logging.ERROR
+    }
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(levels[level])
 
     #create formatter
     formatter = logging.Formatter(fmt=u'[%(asctime)s] [%(levelname)s] [%(funcName)s] %(message)s ')
@@ -253,18 +258,28 @@ def hashmd5(string):
     return md5(string).hexdigest()
 
 
-def get_basedomain(url, basedomain=2):
+def get_basedomain(url, basedomain=1):
     try:
-        if basedomain == 1:
+        if basedomain == 1:  # xxx.iqiyi.com
             return urlparse.urlparse(url).netloc
-        elif basedomain == 2:
+        elif basedomain == 2: # iqiyi.com
             return extract(url).registered_domain
-        elif basedomain == 3:
+        elif basedomain == 3: # iqiyi
             return extract(url).domain # 更加有关联性的处理方法
     except Exception as e:
         pass
 
 
+
+def argsparse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--basedomain", type=int, default=1, help="get the domian of url,i.e. url=www.iqiyi.com if value=1, return www.iqiyi.com, if value=2, return iqiyi.com, if value=3 return iqiyi")
+    parser.add_argument("--limit", type=int, default=20, help="the time limit default 20m")
+    parser.add_argument("-u", help="the url to spider")
+    parser.add_argument("--taskname", default="test", help='the taskname wanna set')
+    parser.add_argument("--goon", help="continue the spider")
+    parser.add_argument("--wsaddr", help="the websocket address of headless chrome")
+    args = parser.parse_args()
 
 if __name__ == '__main__':
     s = TURL('http://static.iqiyi.com/js/pingback/iwt.js?_=21312312')

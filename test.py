@@ -2,41 +2,24 @@ import asyncio
 import time
 import re
 import json
+import sys
 import threading
 from queue import Queue
 from threading import Thread
 from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
 from lib.headlesscrower import HeadlessCrawler
-from lib.commons import TURL, hashmd5, get_basedomain
+from lib.commons import TURL, hashmd5, get_basedomain, argsparse
 from lib.UrlDeDuplicate import UrlPattern
 from multi_process import AdvancedConcurrencyManager
 #from pyppeteer.network_manager import Request
 
 
-
-def workthread(conf, wsaddr, cookie=None, domain=''):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    try:
-        tasks = [worker(conf, wsaddr, cookie=cookie, domain=domain) for i in range(10)]
-        loop.run_until_complete(asyncio.gather(*tasks))
-    except KeyboardInterrupt:
-        # Canceling tasks
-        tasks = asyncio.Task.all_tasks()
-
-        map(asyncio.Task.cancel, tasks)
-
-        loop.run_forever()
-        tasks.exception()
-    finally:
-        loop.close()
-
-
-async def worker(conf, wsaddr, cookie=None, domain=''):
+async def worker(conf, wsaddr, cookie=None, domain='', goon=False):
     redis_util = RedisUtils(conf)
-    print("wsaddr={}\ndomain={}".format(wsaddr, domain))
+    if goon:
+        pass
+    # print("wsaddr={}\ndomain={}".format(wsaddr, domain))
     while True:
         # 退出条件？如果用广度优先遍历，那么深度到一定程序如4层，就可以退出了
         # 或者redis的任务为0了,就可以退出了
@@ -307,8 +290,13 @@ async def test(wsaddr, url):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/04bce773-07cc-46f1-be66-3f95a6b5b753'
-    url = 'http://www.iqiyi.com/'
+    args = argsparse()
+    if args.wsaddr is None or args.u is None:
+        args.print_args()
+        sys.exit(-1)
+    
+    wsaddr = args.wsaddr
+    url = args.u
     iqiyi_cookie = None
     with open('iqiyi_cookie.json', 'r') as f:
         iqiyi_cookie = json.load(f)
@@ -319,7 +307,7 @@ async def main():
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
     start = time.time()
-    await spider(wsaddr, url, 'mp',cookie=iqiyi_cookie, goon=True)
+    await spider(wsaddr, url, args.taskname, cookie=iqiyi_cookie, goon=True)
     print(time.time() - start)
 
 if __name__ == '__main__':

@@ -44,16 +44,21 @@ async def mutationobserver(page):
                             //console.info('Mutation AddedNodes:', node.src || node.href);
                             };
 
+                        try{
+                            var a_tag = record.addedNodes[i].querySelectorAll('a');
 
-                        var a_tag = record.addedNodes[i].querySelectorAll('a');
-
-                        for(var j = 0; j < a_tag.length; ++j){
-                            var a = a_tag[j];
-                            if (a.src || a.href) {
-                                window.LINKS.push(a.src || a.href);
-                                //console.log('Mutation AddedNodes:', a.src || a.href);
-                                };
+                            for(var j = 0; j < a_tag.length; ++j){
+                                var a = a_tag[j];
+                                if (a.src || a.href) {
+                                    window.LINKS.push(a.src || a.href);
+                                    //console.log('Mutation AddedNodes:', a.src || a.href);
+                                    };
+                            }
+                            
+                        }catch(err){
+                            console.log(err);
                         }
+
                     }
                 }
             });
@@ -149,12 +154,6 @@ async def mutationobserver(page):
     print('获取事件被触发后的节点属性变更更信息')
 
 
-
-async def hook_response(resp):
-    # # print("resp.url = {}".format(resp.url))
-    # print("response.request.headers")
-    # print(resp.request.headers)
-    pass
 
 
 async def dismiss_dialog(dialog):
@@ -264,6 +263,7 @@ class HeadlessCrawler(object):
         self.event = [] # event 事件
         self.depth = depth
         self.headers = {}
+        self.reponse_url = []
         self.scheme = urlparse.urlparse(self.url).scheme
         # print('self.wsaddr')
 
@@ -279,7 +279,7 @@ class HeadlessCrawler(object):
             self.page.on('error', hook_error)
             self.page.on('request', self.hook_request)
             self.page.on('console', hook_console)
-            self.page.on('response', hook_response)
+            self.page.on('response', self.hook_response)
         except Exception as e:
             print("[_init_page] [Error] {}".format(repr(e)))
             exc_type, exc_value, exc_traceback_obj = sys.exc_info()
@@ -289,6 +289,11 @@ class HeadlessCrawler(object):
     async def _close(self):
         await self.page.close()
         # await self.brower.close()
+
+
+    async def hook_response(self):
+        # 监听响应，并保存至mongo里
+        pass
 
 
     def add_to_collect(self, item):

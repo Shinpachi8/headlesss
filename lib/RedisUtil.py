@@ -24,6 +24,7 @@ class RedisConf(object):
         self.task_unscan = taskname + ':unscan'
         self.task_pattern = taskname + ':pattern'
         self.task_domain = taskname + ':domain' # 用来比较域名
+        self.task_config = taskname + ':config'
 
 
 
@@ -41,6 +42,7 @@ class RedisUtils(object):
         self.h_url_scanned = conf.task_scanned
         self.h_url_pattern = conf.task_pattern
         self.l_task_domain = conf.task_domain
+        self.l_task_config = conf.task_config
         self.redis_client = None
         self.connect(conf)
 
@@ -130,7 +132,20 @@ class RedisUtils(object):
         self.redis_client.lpush(self.l_task_domain, domain)
         return domain
 
+    def insert_task_confi(self, config):
+        """
+        :param timeout: default 0, block mode
+        :return:
+        """
+        return self.redis_client.lpush(self.l_task_config, config)
 
+
+    def fetch_task_config(self, timeout=0):
+        """
+        :param timeout: default 0, block mode
+        :return:
+        """
+        return self.redis_client.lpop(self.l_task_config)
 
 
     def flushdb(self):
