@@ -5,6 +5,7 @@
 import re
 import json
 import socket
+import sys
 import string
 import urllib
 import logging
@@ -24,7 +25,7 @@ except:
 import random
 import requests
 from requests import  ConnectTimeout
-import argparse 
+import argparse
 
 STATIC_EXT = ["f4v","bmp","bz2","css","doc","eot","flv","gif"]
 STATIC_EXT += ["gz","ico","jpeg","jpg","js","less","mp3", "mp4"]
@@ -280,6 +281,10 @@ def argsparse():
     parser.add_argument("--goon", help="continue the spider")
     parser.add_argument("--wsaddr", help="the websocket address of headless chrome")
     args = parser.parse_args()
+    if args.wsaddr is None or args.u is None:
+        parser.print_help()
+        sys.exit(-1)
+    return args
 
 if __name__ == '__main__':
     s = TURL('http://static.iqiyi.com/js/pingback/iwt.js?_=21312312')

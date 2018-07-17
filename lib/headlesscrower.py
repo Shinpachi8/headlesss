@@ -54,7 +54,7 @@ async def mutationobserver(page):
                                     //console.log('Mutation AddedNodes:', a.src || a.href);
                                     };
                             }
-                            
+
                         }catch(err){
                             console.log(err);
                         }
@@ -291,7 +291,7 @@ class HeadlessCrawler(object):
         # await self.brower.close()
 
 
-    async def hook_response(self):
+    async def hook_response(self, response):
         # 监听响应，并保存至mongo里
         pass
 
@@ -652,7 +652,7 @@ class HeadlessCrawler(object):
 
 
 async def main():
-    wsaddr = 'ws://10.127.21.237:9223/devtools/browser/030eae41-55f0-4000-9bb9-8f29c539cc5e'
+    wsaddr = 'ws://10.127.21.237:9222/devtools/browser/f3f68d37-aabb-43b7-9d75-986a8be08e2d'
     iqiyi_cookie = None
     with open('iqiyi_cookie.json', 'r') as f:
         iqiyi_cookie = json.load(f)
@@ -668,7 +668,8 @@ async def main():
         cookie.append(i)
     #cookie = '''P00002=%7B%22uid%22%3A%221444386669%22%2C%22pru%22%3A1444386669%2C%22user_name%22%3A%2218510725391%22%2C%22nickname%22%3A%22shinpachi8%22%2C%22pnickname%22%3A%22shinpachi8%22%2C%22type%22%3A11%2C%22email%22%3A%22xiaoyan_jia1%40163.com%22%7D; P00003=1444386669; P00004=-898887952.1530510174.aab7357f0a; P00010=1444386669; P000email=xiaoyan_jia1%40163.com; P00PRU=1444386669; P01010=1531497600; QC005=2e297c2e4c4776d707615ef8c2f843a8; QC006=z9mc893qf3lvb9lj917avu9r; QC007=DIRECT; QC008=1530510165.1530510165.1531102822.2; QC021=%5B%7B%22key%22%3A%22playlist%22%7D%5D; QC124=1%7C0; QC160=%7B%22u%22%3A%2218510725391%22%2C%22lang%22%3A%22%22%2C%22local%22%3A%7B%22name%22%3A%22%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86%22%2C%22init%22%3A%22Z%22%2C%22rcode%22%3A48%2C%22acode%22%3A%2286%22%7D%2C%22type%22%3A%22p1%22%7D; QC170=0; QC173=0; QP001=1; QP007=0; QP008=960; T00404=d9f71cc5e254f427d8ad8deeeca112dd; T00700=EgcI18DtIRAB; QC010=230539999; __dfp=a0a801605d3043494885594bed84b92f81f3025593d0ea319c5e6aa109cffbf99a@1531806166483@1530510166483; P00001=e42m1S8Z2RIMm2m3QxiWhHAbEm1nyG2GF54yq76z8bNiLR8bnMXK64JUKn965NScMC9i8o48; P00007=e42m1S8Z2RIMm2m3QxiWhHAbEm1nyG2GF54yq76z8bNiLR8bnMXK64JUKn965NScMC9i8o48'''
 
-    a = HeadlessCrawler(wsaddr, 'http://www.iqiyi.com/u', cookie=cookie)
+    print(wsaddr)
+    a = HeadlessCrawler(wsaddr, 'http://www.iqiyi.com/', cookie=cookie)
     #a = HeadlessCrawler(wsaddr, 'https://mp.iqiyi.com/')
     await a.spider()
     test = a.collect_url
@@ -679,3 +680,18 @@ async def main():
      #     json.dump((a.fetched_url), f)
 
 # asyncio.get_event_loop().run_until_complete(main())
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    task = asyncio.ensure_future(main())
+    print('start........')
+    try:
+        loop.run_until_complete(task)
+    except Exception as e:
+        #print(asyncio.gather(*asyncio.Task.all_tasks()).cancel())
+        loop.stop()
+        loop.run_forever()
+    finally:
+        loop.close()
+    '''
+    asyncio.get_event_loop().run_until_complete(main())
+    '''

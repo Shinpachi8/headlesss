@@ -5,6 +5,7 @@ import json
 import sys
 import threading
 from queue import Queue
+from multiprocessing import Process
 from threading import Thread
 from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
@@ -289,12 +290,9 @@ async def test(wsaddr, url):
 
 
 
-async def main():
+def main():
     args = argsparse()
-    if args.wsaddr is None or args.u is None:
-        args.print_args()
-        sys.exit(-1)
-    
+
     wsaddr = args.wsaddr
     url = args.u
     iqiyi_cookie = None
@@ -304,11 +302,47 @@ async def main():
     #print(iqiyi_cookie)
     print(type(iqiyi_cookie))
 
+    print(wsaddr, url)
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
+
+    wsaddr = 'ws://10.127.21.237:9222/devtools/browser/f3f68d37-aabb-43b7-9d75-986a8be08e2d'
+    url = 'http://www.iqiyi.com'
+    taskname = 'test'
     start = time.time()
-    await spider(wsaddr, url, args.taskname, cookie=iqiyi_cookie, goon=True)
+    loop = asyncio.get_event_loop()
+    x = spider(wsaddr, url, taskname, cookie=iqiyi_cookie, goon=False)
+    try:
+        tasks = [asyncio.ensure_future(x),]
+        loop.run_until_complete(asyncio.wait(tasks))
+    except KeyboardInterrupt as e:
+
+        print(asyncio.Task.all_tasks())
+        for task in asyncio.Task.all_tasks():
+            print(task.cancel())
+        loop.stop()
+        loop.run_forever()
+    finally:
+        loop.close()
     print(time.time() - start)
 
 if __name__ == '__main__':
-    asyncio.get_event_loop().run_until_complete(main())
+    p = Process(target=main)
+    p.daemon = True
+    p.start()
+    starttime = time.time()
+    while True:
+        t = time.time() - starttime
+        if t > 20 * 60:
+            print("timeout")
+            break
+        elif not p.is_alive():
+            break
+        else:
+            time.sleep(10)
+
+    '''
+    main()
+    '''
+
+
