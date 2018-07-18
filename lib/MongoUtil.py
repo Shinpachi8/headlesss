@@ -12,7 +12,7 @@ from pymongo import MongoClient
 
 
 class MongoConf(object):
-    def __init__(self, host, port, db, username=None, password=None)
+    def __init__(self, host, port, db, username=None, password=None):
         self.host = host
         self.port = port
         self.username = username

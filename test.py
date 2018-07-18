@@ -27,8 +27,8 @@ class SpiderWork(object):
     def __init__(self, wsaddr, url, taskname, basedomain=1, cookie=None, goon=False, mongodb='spider', redisdb=1):
         '''
         :param wsaddr:　websocket address of headless chrome
-        :param url: url to spider 
-        :param taskname: taskname, used at redis pattern 
+        :param url: url to spider
+        :param taskname: taskname, used at redis pattern
         :param cookie: the file contains the cookie
         :param goon: if continue the spider
         :param basedomian: the level of fetch domain from url
@@ -78,7 +78,7 @@ class SpiderWork(object):
         if not self.goon:
             print("start from new url.....")
             cookie = self.fetchCookie()
-            a = HeadlessCrawler(wsaddr, url, cookie=cookie)
+            a = HeadlessCrawler(self.wsaddr, self.url, cookie=cookie)
             await a.spider()
             for url in a.collect_url:
                 u = url['url']
@@ -109,7 +109,8 @@ class SpiderWork(object):
     async def worker(self):
         redisutil = self.redisutil
         cookie = self.fetchCookie()
-        if goon:
+        mongoutil = self.mongoutil
+        if self.goon:
             pass
         while True:
             if redisutil.task_counts == 0:
@@ -148,13 +149,13 @@ class SpiderWork(object):
                         task = json.dumps(url)
                         redisutil.insert_one_task(task)
                         redisutil.set_url_scanned(method, pattern_md5)
-                        redisutil.save(url)
+                        mongoutil.save(url)
 
     async def _closePage(self):
         '''
         超时之后可能不会关闭Page，如果不自动关闭会导致过多的page页
         '''
-        browser = async connect(browserWSEndpoint=self.wsaddr)
+        browser = await connect(browserWSEndpoint=self.wsaddr)
         pages = await browser.pages()
         for page in pages:
             await page.close()
@@ -394,8 +395,6 @@ def main():
             iqiyi_cookie = json.load(f)
     #print(iqiyi_cookie)
     # print(type(iqiyi_cookie))
-    mongoutil = MongoUtils(MongoConf)
-    assert mongoutil.connected is True
 
     print(wsaddr, url)
     # with open('fetched_url.json', 'w') as f:
@@ -427,6 +426,7 @@ def main():
     '''
 
 if __name__ == '__main__':
+    '''
     p = Process(target=main)
     p.daemon = True
     p.start()
@@ -442,6 +442,5 @@ if __name__ == '__main__':
             time.sleep(10)
     '''
     main()
-    '''
 
 
