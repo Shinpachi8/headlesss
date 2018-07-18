@@ -11,6 +11,7 @@ from lib.RedisUtil import RedisConf,RedisUtils
 # from bs4 import BeautifulSoup as bs
 from lib.headlesscrower import HeadlessCrawler
 from lib.commons import TURL, hashmd5, get_basedomain, argsparse
+from lib.MongoUtil import MongoConf, MongoUtils
 from lib.UrlDeDuplicate import UrlPattern
 from multi_process import AdvancedConcurrencyManager
 #from pyppeteer.network_manager import Request
@@ -295,19 +296,21 @@ def main():
 
     wsaddr = args.wsaddr
     url = args.u
+    cookie_file = args.cookie
     iqiyi_cookie = None
-    with open('iqiyi_cookie.json', 'r') as f:
-        iqiyi_cookie = json.load(f)
-
+    if cookie_file:
+        with open(cookie_file, 'r') as f:
+            iqiyi_cookie = json.load(f)
+    return
     #print(iqiyi_cookie)
-    print(type(iqiyi_cookie))
+    # print(type(iqiyi_cookie))
 
     print(wsaddr, url)
     # with open('fetched_url.json', 'w') as f:
     #     json.dump((a.fetched_url), f)
 
-    wsaddr = 'ws://10.127.21.237:9222/devtools/browser/f3f68d37-aabb-43b7-9d75-986a8be08e2d'
-    url = 'http://www.iqiyi.com'
+    # wsaddr = 'ws://10.127.21.237:9222/devtools/browser/f3f68d37-aabb-43b7-9d75-986a8be08e2d'
+    # url = 'http://www.iqiyi.com'
     taskname = 'test'
     start = time.time()
     loop = asyncio.get_event_loop()
@@ -327,20 +330,20 @@ def main():
     print(time.time() - start)
 
 if __name__ == '__main__':
-    p = Process(target=main)
-    p.daemon = True
-    p.start()
-    starttime = time.time()
-    while True:
-        t = time.time() - starttime
-        if t > 20 * 60:
-            print("timeout")
-            break
-        elif not p.is_alive():
-            break
-        else:
-            time.sleep(10)
-
+    # p = Process(target=main)
+    # p.daemon = True
+    # p.start()
+    # starttime = time.time()
+    # while True:
+    #     t = time.time() - starttime
+    #     if t > 20 * 60:
+    #         print("timeout")
+    #         break
+    #     elif not p.is_alive():
+    #         break
+    #     else:
+    #         time.sleep(10)
+    mian()
     '''
     main()
     '''

@@ -278,8 +278,16 @@ def argsparse():
     parser.add_argument("--limit", type=int, default=20, help="the time limit default 20m")
     parser.add_argument("-u", help="the url to spider")
     parser.add_argument("--taskname", default="test", help='the taskname wanna set')
-    parser.add_argument("--goon", help="continue the spider")
+    parser.add_argument("--goon", action='store_true', help="continue the spider")
+    parser.add_argument("--cookie", help="the cookie file to load")
     parser.add_argument("--wsaddr", help="the websocket address of headless chrome")
+    # add db
+    db = parser.add_argument_group(title='Database', description='[optional] options for redis and mongodb')
+    db.add_argument('--mongo-db', metavar='STRING', dest='mongo_db', default='spider',
+                    help='Mongodb database name, default "spider"')
+    db.add_argument('--redis-db', metavar='NUMBER', dest='redis_db', type=int, default=0,
+                    help='Redis db index, default 0')
+
     args = parser.parse_args()
     if args.wsaddr is None or args.u is None:
         parser.print_help()

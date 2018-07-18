@@ -7,7 +7,6 @@ See the file 'doc/COPYING' for copying permission
 """
 # from log import logger
 from commons improt LogUtil
-from settings import MongoConf
 from pymongo import MongoClient
 
 
