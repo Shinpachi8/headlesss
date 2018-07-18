@@ -496,7 +496,7 @@ class HeadlessCrawler(object):
                 return
 
             # 访问URL
-            await self.page.goto(self.url, {'waitUntil':'load', 'timeout':15000})
+            await self.page.goto(self.url, {'waitUntil':'load', 'timeout':20000})
             # print(await self.page.cookies())
             #await self.page.evaluate(
             #        'document.cookie = "QC005=2e297c2e4c4776d707615ef8c2f843a8; QC006=z9mc893qf3lvb9lj917avu9r; T00404=d9f71cc5e254f427d8ad8deeeca112dd; QC173=0; P00004=-898887952.1530510174.aab7357f0a; QC160=%7B%22u%22%3A%2218510725391%22%2C%22lang%22%3A%22%22%2C%22local%22%3A%7B%22name%22%3A%22%E4%B8%AD%E5%9B%BD%E5%A4%A7%E9%99%86%22%2C%22init%22%3A%22Z%22%2C%22rcode%22%3A48%2C%22acode%22%3A%2286%22%7D%2C%22type%22%3A%22p1%22%7D; QC007=DIRECT; QC008=1530510165.1530510165.1531102822.2; nu=0; QP001=1; T00700=EgcI18DtIRAB; QC001=1; QC021=%5B%7B%22key%22%3A%22playlist%22%7D%5D; QC124=1%7C0; P00001=a5WUo0Wvm1aZ5IFw2uYzUqkOZK56NuRz5LLCEYyv1LGdRvZm2m14nPFUgfGYKvK5RDCHP70; P00003=1444386669; P00010=1444386669; P01010=1531497600; P00007=a5WUo0Wvm1aZ5IFw2uYzUqkOZK56NuRz5LLCEYyv1LGdRvZm2m14nPFUgfGYKvK5RDCHP70; P00PRU=1444386669; P00002=%7B%22uid%22%3A%221444386669%22%2C%22pru%22%3A1444386669%2C%22user_name%22%3A%2218510725391%22%2C%22nickname%22%3A%22shinpachi8%22%2C%22pnickname%22%3A%22shinpachi8%22%2C%22type%22%3A11%2C%22email%22%3A%22xiaoyan_jia1%40163.com%22%7D; P000email=xiaoyan_jia1%40163.com; QP008=960; QP007=0; QC010=46360036; QC170=0; __dfp=a0a801605d3043494885594bed84b92f81f3025593d0ea319c5e6aa109cffbf99a@1531806166483@1530510166483; QC163=1"'

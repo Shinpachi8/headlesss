@@ -6,7 +6,7 @@ Copyright (c) 2016-2017 twi1ight@t00ls.net (http://twi1ight.com/)
 See the file 'doc/COPYING' for copying permission
 """
 # from log import logger
-from commons improt LogUtil
+from lib.commons import LogUtil
 from pymongo import MongoClient
 
 
@@ -26,8 +26,9 @@ class MongoConf(object):
 
 
 class MongoUtils(object):
-    def __init__(self, conf=mongoconf):
+    def __init__(self, mongoconf):
         self.db = mongoconf.db
+        self.mongoconf=mongoconf
         self._client = None
         self._target = None
         self._others = None
@@ -45,10 +46,10 @@ class MongoUtils(object):
 
     def connect(self):
         try:
-            self._client = MongoClient('mongodb://{}:{}'.format(mongoconf.host, mongoconf.port),
+            self._client = MongoClient('mongodb://{}:{}'.format(self.mongoconf.host, self.mongoconf.port),
                                        connect=False)
-            self._target = self._client[self.db][mongoconf.target]
-            self._others = self._client[self.db][mongoconf.others]
+            self._target = self._client[self.db][self.mongoconf.target]
+            self._others = self._client[self.db][self.mongoconf.others]
         except:
             self.logger.exception('connect mongodb failed!')
 
@@ -100,8 +101,9 @@ class MongoUtils(object):
 
 
 if __name__ == '__main__':
+
     c = MongoUtils()
     c.save({'test': 'test1'})
-    print c.exists({'test': 'test1'})
+    print(c.exists({'test': 'test1'}))
     c.save({'test': 'test2'})
     c.save({'test1': 'test3'})

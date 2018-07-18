@@ -17,8 +17,9 @@ from multi_process import AdvancedConcurrencyManager
 #from pyppeteer.network_manager import Request
 
 
-async def worker(conf, wsaddr, cookie=None, domain='', goon=False):
+async def worker(conf, wsaddr, cookie=None, domain='', goon=False, mongo=None):
     redis_util = RedisUtils(conf)
+    mongoutil = mongo
     if goon:
         pass
     # print("wsaddr={}\ndomain={}".format(wsaddr, domain))
@@ -65,6 +66,7 @@ async def worker(conf, wsaddr, cookie=None, domain='', goon=False):
                     task = json.dumps(url)
                     redis_util.insert_one_task(task)
                     redis_util.set_url_scanned(method, pattern_md5)
+                    mongoutil.save(url)
                 # unscan_queue.put(task)
                 # scanned_set.add( pattern + "|" + pattern_md5)
 
@@ -83,7 +85,7 @@ def sameOrigin(url, domain):
         return False
 
 
-async def spider(wsaddr, url, taskname, cookie=None, goon=False):
+async def spider(wsaddr, url, taskname, cookie=None, goon=False, mongo=None):
     # 2018-07-09 先写单线程，再写成生产者和消费者
     conf = RedisConf(taskname, db=1)
     redis_util = RedisUtils(conf)
@@ -125,8 +127,9 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
                     task = json.dumps(url)
                     redis_util.insert_one_task(task)
                     redis_util.set_url_scanned(method, pattern_md5)
+                    mongo.save(url)
 
-    tasks = [asyncio.ensure_future(worker(conf, wsaddr, cookie, domain)) for i in range(10)]
+    tasks = [asyncio.ensure_future(worker(conf, wsaddr, cookie, domain, mongo=mongo)) for i in range(10)]
     # print(tasks)
     await asyncio.wait(tasks)
 
@@ -201,89 +204,6 @@ async def spider(wsaddr, url, taskname, cookie=None, goon=False):
 
 
 
-async def test(wsaddr, url):
-    # 2018-07-09 先写单线程，再写成生产者和消费者
-    request_set = Queue()
-    pattern_set = set()
-    unrequest_set = Queue()
-
-    a = HeadlessCrawler(wsaddr, url)
-    await a.spider()
-    # print(a.collect_url)
-    for url in a.collect_url:
-        # u = url['url']
-        # u = TURL(u)
-        # if u.is_ext_static() or u.is_block_path() or u.is_block_host():
-        #     # 静态文件，黑名单路径，黑名单的host
-        #     continue
-        # pattern = get_pattern(u)
-        # if pattern in pattern_set:
-        #     continue
-        # else:
-        #     pattern_set.add(pattern)
-        # if 'request' in url:
-        #     request_set.put(url)
-        # else:
-        await unrequest_set.put(url)
-
-    depth = 0
-    # print("[now] [lenth of unrequest_set] =======  {}".format(unrequest_set.qsize()))
-    while not unrequest_set.empty():
-        # print("[now] [lenth of unrequest_set] =======  {}".format(unrequest_set.qsize()))
-        url = await unrequest_set.get()
-        depth = int(url['depth'])
-        if depth > 3:
-            continue
-        else:
-            depth += 1
-        url = url['url']
-        pattern = get_pattern(url)
-        if pattern in pattern_set:
-            print("found pattern, igore URL： {}".format(u))
-            continue
-        else:
-            pattern_set.add(pattern)
-
-
-        a = HeadlessCrawler(wsaddr, url, depth=depth)
-        await a.spider()
-        # print("===========================================\n")
-        # print("url: {}".format(url))
-        # print("len_of_a.collect_url:  {}".format(len(a.collect_url)))
-        # print("===========================================\n")
-        for url in a.collect_url:
-            u = url['url']
-            if u.startswith('javascript') or u.startswith("about"):
-                continue
-            u = TURL(u)
-            if u.is_ext_static():
-                print("u.is_ext_static: {}".format(u))
-                continue
-            elif u.is_block_path():
-                print("u.is_block_path: {}".format(u))
-                continue
-            elif u.is_block_host():
-                print("u.is_block_host: {}".format(u))
-                continue
-
-
-            # print('pattern==={}'.format(pattern))
-            if 'request' in url:
-                await request_set.put(url)
-                print("[now] [lenth of request_set] =======  {}".format(request_set.qsize()))
-            else:
-                await unrequest_set.put(url)
-
-
-
-    print("========done=========")
-    all_url = []
-    while not request_set.empty():
-        _ = await request_set.get()
-        all_url.append(_)
-
-    with open('result.json', 'w') as f:
-        json.dump(all_url, f)
 
 
 
@@ -298,12 +218,14 @@ def main():
     url = args.u
     cookie_file = args.cookie
     iqiyi_cookie = None
+    MongoConf.db = args.mongo_db
     if cookie_file:
         with open(cookie_file, 'r') as f:
             iqiyi_cookie = json.load(f)
-    return
     #print(iqiyi_cookie)
     # print(type(iqiyi_cookie))
+    mongoutil = MongoUtils(MongoConf)
+    assert mongoutil.connected is True
 
     print(wsaddr, url)
     # with open('fetched_url.json', 'w') as f:
@@ -311,10 +233,10 @@ def main():
 
     # wsaddr = 'ws://10.127.21.237:9222/devtools/browser/f3f68d37-aabb-43b7-9d75-986a8be08e2d'
     # url = 'http://www.iqiyi.com'
-    taskname = 'test'
+    taskname = args.taskname
     start = time.time()
     loop = asyncio.get_event_loop()
-    x = spider(wsaddr, url, taskname, cookie=iqiyi_cookie, goon=False)
+    x = spider(wsaddr, url, taskname, cookie=iqiyi_cookie, goon=False, mongo=mongoutil)
     try:
         tasks = [asyncio.ensure_future(x),]
         loop.run_until_complete(asyncio.wait(tasks))
@@ -330,20 +252,19 @@ def main():
     print(time.time() - start)
 
 if __name__ == '__main__':
-    # p = Process(target=main)
-    # p.daemon = True
-    # p.start()
-    # starttime = time.time()
-    # while True:
-    #     t = time.time() - starttime
-    #     if t > 20 * 60:
-    #         print("timeout")
-    #         break
-    #     elif not p.is_alive():
-    #         break
-    #     else:
-    #         time.sleep(10)
-    mian()
+    p = Process(target=main)
+    p.daemon = True
+    p.start()
+    starttime = time.time()
+    while True:
+        t = time.time() - starttime
+        if t > 10 * 60:
+            print("timeout")
+            break
+        elif not p.is_alive():
+            break
+        else:
+            time.sleep(10)
     '''
     main()
     '''
