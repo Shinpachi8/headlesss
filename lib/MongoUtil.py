@@ -12,15 +12,16 @@ from pymongo import MongoClient
 
 
 class MongoConf(object):
-    host = '127.0.0.1'
-    port = 27017
-    username = None
-    password = None
+    def __init__(self, host, port, db, username=None, password=None)
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
 
-    db = 'tspider'
-    # collection
-    target = 'target'
-    others = 'others'
+        self.db = db
+        # collection
+        self.target = 'target'
+        self.others = 'others'
 
 
 
